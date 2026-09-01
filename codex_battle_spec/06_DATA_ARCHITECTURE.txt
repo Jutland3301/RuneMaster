@@ -1,0 +1,293 @@
+DATA / ARCHITECTURE REQUIREMENTS
+================================
+
+GENERAL
+-------
+Use separation of responsibilities without overengineering.
+
+Preferred conceptual responsibilities:
+BattleManager:
+- battle lifecycle
+- enemy registry
+- victory/defeat
+- attack-spacing arbitration
+- battle setup/result
+NOT all rune/spell/UI logic.
+
+PlayerCombat:
+- HP
+- hitstun/invulnerability
+- player combat state/input permissions
+- target ownership as appropriate
+
+RuneCaster:
+- current rune casting process
+- casting judgement
+- combo building interface
+
+CastingGauge:
+- visual/pattern runtime for current cast
+
+SpellDatabase:
+- unordered rune-combination -> SpellData resolution
+
+Spell execution/effect layer:
+- PlayerAttackEvent resolution
+- spell-specific/common effect handlers
+- hand/enemy-side timing
+
+Enemy:
+- own HP/status/AI timing
+- requests attack permission centrally
+
+StatusEffectController:
+- status durations/stacking/effect hooks
+
+BattleUI:
+- presentation/subcomponents
+
+Use signals where they make dependencies cleaner, but do NOT make every tiny operation signal-based and impossible to trace.
+
+PLAYER INPUT STATE
+------------------
+A clear state model is required.
+Possible conceptual states:
+IDLE
+CASTING
+PARRY_FRONT
+PARRY_UP
+PARRY_DOWN
+PARRY_LEFT
+PARRY_RIGHT
+HITSTUN
+DEAD
+
+Combo possession should NOT necessarily be a separate exclusive state; IDLE can coexist with combo_count > 0.
+Spell activation lock should be an independent timer/flag, because a new combo can be built while the previous spell's activation is resolving.
+
+Centralize "is this input currently allowed?" logic to avoid scattered booleans.
+
+RUNE DATA
+---------
+Use Resource-style data where consistent with existing project.
+Suggested RuneData:
+id
+display_name
+texture
+mini_texture
+color
+is_element
+input/loadout association
+casting_pattern
+
+Current real RuneData only:
+Algiz
+Fire/Kenaz
+Water/Laguz
+Lightning/Hagalaz
+Grass/Ingwaz
+
+Do not invent the remaining 19 rune behaviors.
+
+CASTING PATTERN
+---------------
+CastingPattern can be Resource-style.
+Pattern 1 shared by four elements.
+Architecture must allow future non-horizontal/different patterns without requiring RuneCaster rewrite.
+Do not implement every imagined pattern now.
+
+COMBO
+-----
+- current RuneData IDs/list
+- perfect_count
+- max_combo from player/loadout progression data
+- UI generated from max_combo
+- duplicate validation before cast
+- spell-combination validity before cast
+
+SPELL DATA
+----------
+Use individual .tres SpellData resources for the 10 spells so Inspector balance tuning is easy.
+Suggested properties as useful:
+id
+display_name
+required_runes
+base_damage / hit data
+activation_time
+attribute_id
+target_mode
+effect handler
+presentation/effect hooks
+audio hooks
+screen shake
+etc.
+
+Do not force unused fields everywhere if an effect script is more appropriate.
+
+Spell lookup:
+normalize rune IDs for order-independent key.
+Example conceptual:
+["fire","water"] and ["water","fire"] -> same normalized key -> Mist.
+
+Use common reusable effect types where possible and dedicated handlers for genuinely special behavior.
+DO NOT implement all spells as one giant match.
+DO NOT avoid proper extensibility merely because there are only 10 spells now.
+
+PLAYER ATTACK EVENT VS ENEMY ATTACK EVENT
+-----------------------------------------
+ABSOLUTE REQUIREMENT: separate types/systems.
+They have different semantics.
+
+PlayerAttackEvent can carry:
+source
+target(s)
+SpellData
+calculated damage
+perfect_count
+attribute
+effect metadata
+
+EnemyAttackEvent can carry:
+source enemy
+AttackData
+resolved direction(s)
+damage
+telegraph/parry progression
+
+Treat generated events as mostly immutable snapshots; apply buffs/modifiers at explicit resolution/setup stages rather than allowing arbitrary mutation everywhere.
+
+ENEMY DATA
+----------
+Resource-style EnemyData:
+id
+display_name
+sprite/presentation
+max_hp
+resistances
+attack_pool
+attack_interval_min/max
+parry_stun_duration
+spacing policy/override data
+etc.
+
+Undefined resistance = 1.0.
+0 = immune.
+Arbitrary multipliers supported.
+
+ATTACK DATA
+-----------
+Resource-style AttackData:
+id/name
+damage
+direction_mode (fixed / weighted random)
+fixed_direction
+direction_weights
+telegraph_duration
+parry_window_start/end
+spacing category/policy
+override flags
+telegraph presentation params
+SE/effect hooks
+etc.
+
+Random direction weights editable, normalized at runtime.
+
+VERY IMPORTANT:
+Boss gimmicks do NOT belong as a giant pile of fields in AttackData.
+AttackData is for ordinary attack semantics and reusable attack properties.
+Special boss behavior belongs in boss-specific extension logic.
+
+ATTACK SCHEDULER
+----------------
+Central arbitration sees all enemies.
+Enemy does not inspect sibling scripts.
+Support:
+- global/default spacing
+- enemy/attack-specific spacing categories/settings
+- explicit bypass/override
+- future simultaneous/multi attacks
+
+Avoid a single rigid global cooldown that bosses must hack around.
+
+TIME MANAGEMENT
+---------------
+Avoid Timer-node explosion.
+Also avoid one giant BattleManager _process() doing everything.
+
+Ownership:
+Enemy -> its AI/attack countdown
+StatusEffectController -> status times
+RuneCaster/CastingPattern -> casting time
+BattleManager -> battle-level lifecycle/clock/arbitration
+spell executor -> activation timing
+
+Localized hit-stop:
+- avoid pausing entire SceneTree.
+- BGM continues.
+- UI may continue.
+- use localized simulation/battle time control where appropriate.
+
+BOSS EXTENSION
+--------------
+Boss should still reuse Enemy foundations: HP, resistance, attacks, status etc.
+Allow boss-specific script/extensions.
+Future phase capabilities may change:
+attack pool
+frequency
+telegraphs
+resistance
+BGM
+background
+UI
+but DO NOT implement/connect a phase system now.
+Keep clean extension points only.
+
+Future boss gimmick code (darkness, mouse mode, fake telegraph, multi-direction parry) may have skeleton/interface/extension points but MUST remain disconnected/sealed from current normal battle.
+Do not pollute AttackData with these gimmicks.
+
+EQUIPMENT MODIFIER EXTENSION
+----------------------------
+Future equipment may modify:
+Magic Power
+max HP
+resistance
+casting speed
+Perfect width
+parry windows
+etc.
+
+It is acceptable to prepare a clean modifier interface/skeleton, BUT it must remain disconnected from current battle.
+Make the future connection point obvious and easy to enable later.
+Do not alter current balance through unfinished modifiers.
+Do not litter active code with fragile commented-out lines; prefer a disabled component/interface or clearly isolated extension unless existing project conventions strongly favor another method.
+
+SAVE / RUNTIME DATA
+-------------------
+A Save system IS in current scope.
+Before creating one, inspect existing save implementation and integrate/reuse it if present.
+Do not invent an incompatible second save format.
+
+Persist as appropriate:
+- owned runes
+- max_combo
+- player HP/progression values
+- Magic Power
+- equipment data placeholder/actual existing equipment
+- keybinds
+- resistance knowledge
+- loadout
+
+Keep persistent player data separate from transient battle runtime state.
+
+BATTLE SETUP
+------------
+Generic battle setup should support:
+enemy data list
+background
+BGM override
+origin/return information
+special encounter metadata as needed
+
+Normal enemy auto-positioning handles 1–3.
+Arrays are not fixed at 3.
+Boss/special scene can override placement for 4+.

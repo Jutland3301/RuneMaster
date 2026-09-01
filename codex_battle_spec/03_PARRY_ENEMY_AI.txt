@@ -1,0 +1,168 @@
+ALGIZ PARRY, ENEMY AI, ATTACK SCHEDULING
+=======================================
+
+ALGIZ / PARRY
+-------------
+There are FIVE basic parry categories:
+- FRONT
+- UP
+- DOWN
+- LEFT
+- RIGHT
+
+Input:
+- Algiz alone immediately establishes FRONT guard/parry stance.
+- after Algiz, a direction key can switch it to UP/DOWN/LEFT/RIGHT.
+- no Enter required.
+- after directional stance is selected it cannot be changed directly.
+- to change stance: X -> Algiz -> new direction.
+- there is NO 1.5 s timeout anymore.
+- stance persists indefinitely until:
+  1. successful parry,
+  2. X cancellation,
+  3. a different/wrong attack hits the player (including an i-frame hit),
+  4. death/state termination.
+
+COMBO INTERACTION
+-----------------
+- Algiz cannot be entered while ANY offensive combo/casting is retained.
+- player must press X first to destroy the offensive combo, then Algiz.
+- this is intentional risk/cost.
+- offensive casting does not auto-discard combo to parry.
+- while in parry stance:
+  Enter ignored
+  normal rune keys ignored
+  Left/Right/Up/Down are parry direction input where relevant
+- X exits parry stance.
+- after successful parry stance clears; another attack requires another Algiz input sequence.
+- consecutive attacks can be parried through rapid repeated Algiz + direction inputs.
+
+PARRY TIMING
+------------
+- no perfect-parry/judgement tier for now.
+- each enemy AttackData has a parry-valid window.
+- if the player has the matching stance at ANY point inside that valid window, the attack is cancelled immediately; do not require waiting for impact.
+- corresponding telegraph disappears.
+- player takes no damage by default.
+- attack source enemy is stunned by default.
+- default parry stun: 1.0 s, but make enemy-specific configurable.
+- other enemies continue normally.
+- stun cannot be repeatedly extended/stacked by another stun while already stunned.
+- stun pauses that enemy's attack timer; after stun, resume remaining timer rather than rerolling.
+- parry hit-stop ~0.05–0.1 s, light shake, sharp SE/flash.
+- do NOT pause BGM during hit-stop.
+- avoid SceneTree global pause for hit-stop; use a battle-time/time-scale mechanism or localized freezing.
+
+FRONT TELEGRAPH
+---------------
+- display at upper center of the combat/world area.
+- same broad visual language as directional telegraphs.
+
+FUTURE MULTI-PARRY
+------------------
+Boss attacks may later require e.g. UP and DOWN within one window, in any order.
+Do NOT actively connect this feature now.
+Architecture must not prevent an AttackEvent from later supporting multiple parry requirements.
+Do NOT cram boss gimmicks into normal AttackData.
+
+ENEMY AI
+--------
+- each enemy independently owns its next-attack timing.
+- attack interval is randomized within EnemyData-configurable min/max.
+- each mob usually has 2–4 attacks.
+- boss can have many.
+- battle starts with ~0.5 s enemy timer freeze, then timers begin from zero.
+- each AttackData can define damage, telegraph, parry window, direction behavior, presentation hooks etc.
+
+DIRECTION MODE
+--------------
+Attack direction must support:
+- FIXED direction
+- RANDOM weighted direction
+Weighted random:
+- initial convenient default may be 0.2 for each of five directions.
+- weights are editable.
+- normalize weights internally if they do not sum to 1.
+- zero weight means direction cannot be chosen.
+
+ATTACK SPACING / CENTRAL ARBITRATION
+------------------------------------
+Normal enemies should not blindly overlap attacks.
+DO NOT make Enemy A inspect Enemy B's script directly.
+
+Instead:
+Enemy reaches its attack timer
+ -> asks central BattleManager/AttackScheduler whether starting now satisfies encounter spacing rules
+ -> manager checks active/recent attacks
+ -> permits or delays/reschedules appropriately.
+
+The exact policy should be centralized and deterministic enough to debug.
+
+IMPORTANT:
+- minimum spacing rules must be configurable.
+- enemy and/or attack data may have specific spacing behavior.
+- ALWAYS provide explicit override/escape flags so bosses AND special normal enemies can intentionally violate normal spacing rules.
+- future attack types may need different spacing categories/rules.
+- do not design the base scheduler so "all attacks must always obey one global cooldown".
+- simultaneous attacks remain possible by design in special cases.
+
+TELEGRAPH
+---------
+For each attack:
+- direction is unambiguous in normal enemies.
+- visual: dark-orange box containing "!".
+- positions:
+  UP -> top edge
+  DOWN -> boundary near combat world / lower UI
+  LEFT -> left edge
+  RIGHT -> right edge
+  FRONT -> upper center
+- starts semi-transparent.
+- grows brighter/more opaque as impact approaches.
+- blink frequency increases toward impact.
+- may slightly grow.
+- parry-window entry should be visually distinguishable (brighter orange is sufficient).
+- telegraph exists throughout relevant pre-impact progression.
+- parry within valid window cancels attack and telegraph immediately.
+- normal enemies have no fake telegraphs.
+- bosses may later have fake telegraphs that are still learnable/readable.
+
+SOURCE IDENTIFICATION
+---------------------
+In multi-enemy combat, player SHOULD be able to identify which enemy generated a telegraph.
+Do not use a line connecting enemy to telegraph.
+Instead use enemy visual response (e.g. enemy flash) and/or telegraph differences.
+If multiple telegraphs occupy the same direction:
+- do NOT merge them.
+- display separately.
+- distinguish using differences such as size/color/intensity so the player can parse them.
+- special enemies/bosses may violate ordinary spacing and create this case.
+
+ENEMY ATTACK EVENT
+------------------
+Enemy attacks are logical events, not necessarily physical projectile collisions.
+EnemyAttackEvent must be separate from PlayerAttackEvent.
+Suggested fields:
+source_enemy
+attack_data
+resolved_direction
+damage
+telegraph/progress state
+parry-window state
+etc.
+
+PLAYER PARRY + INVULNERABILITY EDGE CASE
+----------------------------------------
+If a wrong attack hits while player is invulnerable:
+- damage 0
+- combo remains (normally no combo exists during parry anyway)
+- parry stance is cancelled
+- invulnerability timer is NOT extended.
+
+ENEMY DEATH
+-----------
+- death immediately stops AI.
+- cancel its active attack/telegraph.
+- cannot be targeted.
+- play an effect-based disappearance/death animation (not just a plain fade; no extra art required).
+- existing incoming player effects targeting a dying/dead enemy do nothing.

@@ -1,0 +1,205 @@
+BATTLE UI, VISUAL PRESENTATION, AUDIO
+====================================
+
+REFERENCE LAYOUT
+----------------
+Reference resolution: 1920x1080, 16:9.
+Use Godot stretch/anchors so resizing and other 16:9-ish sizes behave correctly.
+
+Top ~60%:
+- combat world/background
+- enemies
+- enemy HP
+- telegraphs
+
+Bottom ~40%:
+- dark/stone-like UI area
+- left: Player HP + status icons
+- center: rune casting UI
+- right: fusion/output rune stone
+
+Do NOT draw an explicit separator line between top and bottom.
+They are visually distinct panels/areas; do not make them one continuous world plane.
+
+WORLD / ENEMIES
+---------------
+- background image fills combat-world area.
+- enemy positions as specified elsewhere.
+- common baseline/foot placement.
+- enemy sizes can differ moderately.
+- bosses can be substantially larger.
+- subtle idle vertical movement + slight scale/breathing acceptable.
+- attack presentation can use tween motion when no dedicated animation exists.
+- hit: white flash + slight lateral shake.
+- weakness/Perfect may strengthen impact response.
+- effect-based death/disintegration style; do not simply plain-fade.
+
+ENEMY HP / HOVER
+----------------
+- HP bar above enemy.
+- no player-facing enemy name constantly displayed.
+- HP numeric value can be available in hover info.
+- mouse hover panel shows:
+  name
+  HP numeric
+  statuses
+  resistance knowledge according to discovery rules.
+- in Debug reveal mode, all resistances visible.
+- delayed HP trail should smoothly catch up (~0.3 s).
+- boss can later use a large dedicated boss HP bar.
+
+TARGET
+------
+- thin dim red sprite outline only while an offensive combo exists.
+- no outline during empty idle.
+- no target change during casting.
+- outline hidden after firing because combo clears; target identity remains remembered.
+- shader outline preferred if safe.
+
+PLAYER UI — LEFT
+----------------
+- normal-sized horizontal HP bar, not enormous.
+- show "current / max" number in/near bar.
+- no player name.
+- no portrait.
+- Magic Power does NOT need normal player-facing display; may appear in Debug.
+- Buff/Debuff icons:
+  2 rows x 4 columns (8 total visible slots)
+  row 1 = buffs
+  row 2 = debuffs
+- small icons.
+- no normal countdown text.
+- placeholder icon tiles/letters are acceptable if assets absent, but layout should be replaceable by final art.
+- low HP threshold: 25%.
+- low HP: HP bar blink + red screen-edge vignette, stronger as HP falls.
+- player hit: light full-screen shake; do not unnecessarily shake only the left panel.
+
+CASTING UI — CENTER
+-------------------
+Primary bottom-center interaction area:
+- horizontal casting gauge toward upper part.
+- combo slots below/near it.
+- current rune name/image around gauge.
+- idle gauge extremely dark/faint.
+- rune input -> strong fade-in (~0.1 s).
+- after judgement -> fade back.
+- combo slots remain readable.
+- empty slots: dark stone-circle feel.
+- rune success: symbol settles/snaps into slot.
+- PERFECT: stronger flash.
+- NORMAL: light white response.
+- MISS: gauge brief red response + small red MISS text; do not overdo.
+- X cancel: slot/rune disappearance without red MISS treatment.
+- PERFECT xN only show x2+.
+- show an Enter firing prompt when spell is ready.
+- dim/disable that prompt during hand-side spell activation lock.
+
+FUSION UI — RIGHT
+-----------------
+Large stone circle with silver rim, roughly 70–80% of lower-panel height where appropriate.
+Existing project reportedly already separates:
+- stone circle asset
+- rune symbol image
+Therefore do NOT duplicate stone backgrounds when combining runes.
+
+Behavior:
+- first successful rune: its rune symbol appears over stone and begins colored glow.
+- second: overlay the second rune symbol at same central alignment, no intentional rotation/offset.
+- blend/fusion color transitions over ~0.2–0.3 s.
+- rune symbols themselves can remain visually layered.
+- fusion color is NOT gameplay-affecting.
+- use a brightened/custom blend rather than naïve RGB multiplication that becomes muddy/dark.
+- stone and silver rim can catch/refelect glow.
+- firing: strong flash, then reset to empty/dark.
+- X/MISS/hit: glow and symbols clear appropriately.
+
+Below fusion stone inside right panel:
+Line 1: current resolved spell name.
+Line 2: component rune composition shown as small BLACK rune-symbol marks plus text/separators as appropriate.
+Do not clutter this panel with predicted damage/Perfect/Buff info for now.
+
+SPELL HAND PRESENTATION
+-----------------------
+- hand normally absent.
+- on spell activation, hand quickly enters/moves to a fixed-ish position slightly above/right of lower UI.
+- if no hand sprite exists, use a clean placeholder only; do not download/generate art.
+- hand -> rune/spell glow -> enemy-side effect -> hand leaves.
+- spell-specific hand glow color.
+- mixed spells use appropriate mixed color.
+- incoming enemy combat continues during all of this.
+- ordinary player hit does NOT cancel an already accepted spell; player death does.
+- enemy-side effect beginning releases spell activation lock.
+
+TELEGRAPH VISUALS
+-----------------
+See enemy spec.
+Dark orange "! in box".
+Do NOT use rounded-box styling if not needed; square/clean box is fine.
+Telegraph becomes brighter, more opaque, faster blinking and optionally slightly larger near impact.
+Enemy source should also visually respond so source is identifiable.
+Same-direction concurrent telegraphs remain separate and visually distinguishable.
+
+"JUICE" / FEEDBACK
+------------------
+Goal: satisfying, slightly pachinko-like reward feedback without becoming unreadable.
+
+PERFECT:
+- central/converging flash acceptable.
+- satisfying distinct SE.
+- consecutive P increases feedback intensity/pitch.
+- x4 can be very dramatic later.
+- hand-side cast glow can scale with perfect_count.
+- spell impact shake/hit-stop can scale moderately with large damage.
+
+PLASMA:
+- three hits weak -> medium -> strong; third strongest.
+
+ELECTRIC WHIP:
+- do NOT draw chain line between enemies in current implementation.
+
+DOT:
+- subdued tick visuals/numbers.
+
+IMMUNE:
+- gray/subdued IMMUNE + dull SE hook.
+
+PARRY:
+- should feel sharper than ordinary Spell PERFECT.
+- enemy + telegraph can flash white.
+- ~0.05–0.1 s hit-stop.
+- light shake.
+- sharp SE.
+- no special consecutive-parry combo system now.
+
+AUDIO
+-----
+Basic Battle BGM 1:
+- loop.
+- provisional volume around -10 dB.
+- separate BGM and SFX Audio buses.
+- architecture supports future separate settings volume.
+- if exact BGM asset is absent, warn and allow battle to run silently; never crash.
+
+Provide AudioStreamPlayer/hooks (silent if no assets) for:
+- rune input
+- NORMAL
+- PERFECT
+- MISS
+- X cancel
+- target change
+- spell cast
+- spell hit
+- player hit
+- telegraph
+- parry
+- victory
+- defeat
+
+Do NOT download/generate SFX.
+Only connect existing provided BGM if found.
+
+KEYBIND / LOADOUT UI VISUAL QUALITY
+-----------------------------------
+Do NOT throw together a disposable ugly default Control layout that will need structural replacement.
+Create clean layout regions/containers and spacing intended to receive final custom buttons/panels/art later.
+It may use temporary styling, but scene hierarchy and space allocation should be final-UI-friendly.

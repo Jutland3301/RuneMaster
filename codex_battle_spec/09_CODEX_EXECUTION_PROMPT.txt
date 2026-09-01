@@ -1,0 +1,37 @@
+COPY/PASTE THIS INTO CODEX
+==========================
+
+You are implementing a complete first-pass real-time rune battle system in my EXISTING Godot project.
+
+A specification package is provided alongside this prompt. Read EVERY specification .txt file before making implementation decisions, especially 00_READ_FIRST.txt.
+
+Your job is not to redesign the game. The gameplay specification has already been decided through an extensive design interview.
+
+Execution requirements:
+
+1. Inspect the existing project first: project.godot/Godot version, InputMap, Autoloads, scenes, scripts, save/audio systems, rune/player systems, and relevant assets. Search for the existing rune symbol images, stone-circle/silver-frame UI assets, enemy assets, and battle BGM.
+2. Adapt the specification to the existing architecture. Reuse working systems where appropriate.
+3. Do not destructively rewrite unrelated working project code.
+4. Do not rename/move existing assets without a compelling technical reason.
+5. Do not download assets, install plugins, or add external dependencies.
+6. Implement the ENTIRE active scope in the package, not just isolated snippets. You may internally work in stages, but continue through integration and verification.
+7. Do not leave core requested behavior as TODOs.
+8. Keep future equipment/boss-gimmick/phase extension points isolated and DISCONNECTED from current combat exactly as specified.
+9. Keep PlayerAttackEvent and EnemyAttackEvent strictly separate.
+10. Do not hardcode max_combo=2 into logic or UI.
+11. Do not turn BattleManager into a giant god-object. Respect responsibility boundaries in the architecture spec.
+12. Do not create a giant spell_id/status_id match statement when reusable effect handlers or dedicated effect scripts are appropriate.
+13. Do not invent mana, an ultimate gauge, dodge mechanics, rewards, XP, loot, or other unspecified gameplay.
+14. Build the playable 3-enemy test battle and the Debug tooling specified.
+15. Implement Loadout/Keybind configuration and resistance-knowledge persistence.
+16. If an existing Save system exists, integrate it instead of creating an incompatible second system.
+17. If the BGM asset is absent, warn gracefully and keep Battle playable silently rather than creating a broken resource reference.
+18. Use the Godot CLI/headless/runtime checks available in the environment. Fix parser, resource, NodePath, signal, InputMap and startup/runtime errors before stopping.
+19. Run practical smoke/behavior tests listed in the test specification where feasible.
+20. After implementation, provide only a concise report: changed/created files, how to run the test battle, controls/debug access, sealed future extension points, actual tests run, and genuine remaining issues.
+
+When a minor detail is not specified, choose the simplest implementation consistent with the architecture and existing project. Do not stop to ask me about trivial implementation details.
+
+If a specification fundamentally conflicts with an existing working subsystem, preserve the working project, make the least destructive adaptation possible, and clearly report the conflict.
+
+Begin by reading the project and all specification files. Then implement, integrate, run, test, fix, and only then report completion.

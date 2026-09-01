@@ -1,0 +1,178 @@
+DEBUG, TEST SCENE, SELF-TEST, ACCEPTANCE
+========================================
+
+TEST BATTLE
+-----------
+Create a playable test Battle scene with 3 enemies.
+Use high enough HP to test sustained combat, provisional:
+A ~1000
+B ~1200
+C ~1500
+
+Give visibly different resistance profiles, for example:
+A Fire weakness / Water resistance
+B Lightning weakness / Grass resistance
+C one mixed attribute such as Plasma immune
+Exact test values may be adjusted but must exercise:
+weakness
+resistance
+neutral
+immunity
+knowledge discovery
+
+Each test enemy should have ~2–4 attacks.
+Across the three, exercise:
+- all five parry directions
+- fixed-direction attack
+- weighted-random attack
+- normal attack-spacing arbitration
+Do NOT enable an always-on scheduler-bypass test attack in normal test gameplay.
+Debug controls can force special cases.
+
+DEBUG OVERLAY
+-------------
+Toggleable, e.g. F3 unless conflicting with existing project.
+Must be informative but NOT overwhelming.
+
+Core overlay:
+- FPS
+- RNG seed
+- Player state
+- HP
+- Magic Power
+- invulnerability remaining
+- hitstun remaining
+- active parry stance
+- current cast cursor normalized position/judgement region
+- current combo IDs
+- perfect_count
+- selected target
+- spell activation lock
+- current buffs/debuffs and remaining debug times
+
+Per enemy:
+- HP
+- next attack timer
+- current attack
+- direction
+- telegraph progress
+- parry window state
+- stun/paralysis state
+
+Scheduler:
+- relevant global spacing state / last attack timing
+
+Use collapsible/compact grouping or concise lines so the user can understand it. Do not flood the screen with dozens of unlabeled numbers.
+
+DEBUG CONTROLS
+--------------
+Provide practical manual reproduction tools, but keep them discoverable/documented and not absurdly numerous.
+Useful:
+- toggle player invulnerability/god mode
+- heal/reset player
+- change/show Magic Power
+- restart battle
+- set/show RNG seed
+- force a chosen enemy attack/direction
+- force/apply Mist/Guard/Burn/Paralysis for testing
+- kill/damage selected enemy if useful
+- resistance reveal-all toggle
+
+Avoid stealing normal gameplay keys. Debug controls can live in a small debug panel rather than mapping everything to keyboard.
+
+RNG
+---
+Support fixed RNG seed for reproducible AI/target/random-direction testing.
+
+CODEX / GODOT SELF-TEST
+-----------------------
+If Godot CLI is available:
+1. import/open project headlessly as appropriate.
+2. verify parser errors = 0.
+3. verify .tres resources parse.
+4. verify missing resources = 0 for requested implementation.
+5. verify NodePaths.
+6. verify signal connections.
+7. verify InputMap actions.
+8. launch test battle headlessly or with available runtime mode.
+9. allow it to run long enough to expose startup/runtime errors.
+
+Add lightweight script-based smoke tests where practical.
+Do not build a huge test framework if project has none.
+
+Behavior checks, automate where practical:
+- one-rune combo success
+- two-rune combo success
+- duplicate rune rejected
+- invalid combo rejected before casting
+- MISS clears combo
+- X clears combo
+- Perfect count increments
+- unordered Spell lookup
+- target switching
+- Spell damage formula
+- resistance multiplier
+- immunity
+- Burn ticks and non-refresh
+- Mist duplicate ignore/non-refresh
+- Guard duplicate ignore/non-refresh
+- Paralysis duplicate ignore/non-refresh
+- all five parry directions
+- wrong stance causes hit
+- invulnerability blocks damage
+- i-frame hit does not extend invulnerability
+- hitstun duration/input recovery
+- enemy attack spacing
+- scheduler override mechanism
+- enemy death
+- player death
+- victory
+- retry
+
+Visual quality is manually inspected by user; do not claim automated tests prove visuals are correct.
+
+FINAL ACCEPTANCE CRITERIA
+-------------------------
+1. Project starts with zero parser errors.
+2. Requested battle has zero missing-resource failures.
+3. Test Battle scene is immediately playable.
+4. Fire, Water, Lightning, Grass and Algiz work.
+5. All 10 current Spells resolve and present.
+6. Five-direction parry works.
+7. Three enemies independently attack.
+8. Attack spacing arbitration works.
+9. HP/damage/death/victory/defeat/retry work.
+10. Mist, Guard, Paralysis, Burn work.
+11. NORMAL/PERFECT/MISS work.
+12. target selection works.
+13. resistance works.
+14. resistance knowledge works and persists.
+15. 8-slot Loadout works with locked Algiz Slot 1.
+16. Keybind UI and persistence work.
+17. Debug overlay/tools work.
+18. RNG seed control works.
+19. Basic Battle BGM loops if asset exists.
+20. no external assets/plugins downloaded.
+21. existing project is not destructively broken.
+22. existing exploration/main project still starts/works when Battle is unused.
+23. Battle system has no side effects merely from existing in project.
+24. max_combo change 2 -> 3/4 expands logic/UI without code rewrite.
+25. new Rune primarily requires RuneData + associated valid SpellData/effects.
+26. new Enemy primarily requires EnemyData + AttackData.
+27. boss-special extension points remain sealed/disconnected from current normal combat.
+28. equipment modifier extension remains sealed/disconnected.
+29. PlayerAttackEvent and EnemyAttackEvent remain separate.
+30. no ultimate/special resource gauge was invented.
+
+FINAL CODEX REPORT
+------------------
+At completion, output a concise report:
+- files created
+- files modified
+- how to launch test battle
+- current default controls/keybind access
+- Debug access
+- sealed/unconnected future extension points
+- any genuinely unresolved issue
+- tests actually executed and their result
+Do not bury the user in a massive log.

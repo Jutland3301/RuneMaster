@@ -1,0 +1,143 @@
+LOADOUT, KEYBINDS, KNOWLEDGE, FUTURE EXTENSIONS
+==============================================
+
+OWNED RUNES VS BATTLE LOADOUT
+-----------------------------
+The game can eventually have 24 runes.
+Player does NOT bind all 24 simultaneously.
+
+Battle loadout:
+- approximately 8 slots.
+- Slot 1 is ALWAYS Algiz.
+- Algiz slot has a LOCK icon.
+- Algiz cannot be removed.
+- Algiz is always first.
+- its keybind may still be changed.
+- remaining 7 slots are ordinary equipped runes.
+- current initial test loadout:
+  [Algiz, Fire, Water, Lightning, Grass, Empty, Empty, Empty]
+
+Owned-rune data is separate from loadout.
+Only equipped/owned runes are usable.
+Normal future max combo progression: 2 -> 3 -> 4.
+Internally max_combo belongs to persistent player/progression data; UI reads it.
+Do not make UI break if a special case exceeds 4, although normal balance targets 4.
+
+KEYBINDS
+--------
+Implement keybind configuration NOW.
+- 8 loadout slots have configurable keys.
+- Rune identity and physical key are separate concepts.
+- use Godot InputMap/actions appropriately.
+- prevent duplicate bindings.
+- reserved controls cannot be assigned to rune slots:
+  Enter
+  X/cancel
+  arrow keys
+  Escape
+  and any other essential battle/navigation keys discovered in existing project.
+- show conflict warning.
+- Reset Defaults.
+- persist bindings in Save.
+- Algiz is freely rebindable despite locked loadout slot.
+- current exact default rune keys may be chosen sensibly after inspecting existing InputMap; do not collide with existing controls.
+
+The Keybind/Loadout scene hierarchy must be designed with clean future final-art layout space, not a disposable debug panel.
+
+RESISTANCE KNOWLEDGE
+--------------------
+Normal game does NOT reveal all enemy resistances immediately.
+
+Per enemy SPECIES/EnemyData ID, persist knowledge per attribute.
+
+First encounter:
+- unknown resistance entries display "???".
+- when player actually hits that enemy type with an attribute, reveal that attribute's exact multiplier.
+- display exact multiplier (e.g. x1.5, x0.5, x0.0), not merely Weak/Resist.
+- immunity is learned by attempting the attack too.
+- mixed attributes are independent knowledge: Plasma resistance is not learned from Fire or Lightning.
+- if multiple copies of the same EnemyData ID are present, learning from one reveals that attribute for the species, therefore hover info for the others updates too.
+- later encounters remember all previously learned entries.
+- persist this knowledge in Save.
+
+Debug mode:
+- reveal all toggle bypasses knowledge hiding.
+
+Enemy hover UI should obtain "what may be shown?" from the knowledge system; EnemyData itself simply owns true resistance data.
+This separation is important for future investigation/research mechanics.
+
+FUTURE SPELL TARGET MODES
+-------------------------
+Do not assume every Spell targets an enemy.
+Architecture should allow:
+SINGLE_ENEMY
+ALL_ENEMIES
+RANDOM_MULTI
+SELF
+BATTLE_WIDE
+NONE/special
+
+Current examples:
+Mist -> battle/enemy-wide
+Algae Guard -> self
+others mostly enemy-targeted.
+
+Target red outline is relevant only when the current resolvable spell requires enemy targeting.
+Do not force target_enemy non-null for every spell.
+
+FUTURE SPELL TYPES
+------------------
+Architecture should be able to add, without core rewrite:
+healing
+self buff
+enemy debuff
+single attack
+all attack
+random multi
+DoT
+delayed attack
+multi-hit
+enemy-timer manipulation
+parry manipulation
+summon-like effects
+
+Do not implement all these now.
+
+FUTURE BOSS GIMMICKS — SEALED / DISCONNECTED
+--------------------------------------------
+Potential future mechanics:
+- darken combat world
+- darken UI too
+- temporary mouse-control input mode
+- fake telegraphs
+- multi-direction attacks
+- multi-parry requirement e.g. UP+DOWN within one window, order-independent
+
+Prepare architecture/extension points only.
+DO NOT connect them to normal combat now.
+DO NOT put them all into AttackData.
+Boss-specific script/input mode/gimmick controller is preferred later.
+
+FUTURE PHASES — NOT IMPLEMENTED NOW
+-----------------------------------
+Boss phases may later change:
+- attack pool
+- frequency
+- telegraphs
+- resistance
+- BGM
+- background
+- UI
+No active phase system is required now.
+Boss must still inherit/reuse normal Enemy foundations so future bosses do not require a second combat engine.
+
+EXPLORATION / BATTLE CONNECTION
+-------------------------------
+- Battle is a separate scene.
+- exploration pauses/stops while battle is active.
+- external encounter provides BattleSetup.
+- player HP carries into/out of battle.
+- battle result can return defeated enemy IDs/stats.
+- no reward screen, XP, levels, loot, or rune drops now.
+- battle BGM replaces/fades/stops exploration BGM as appropriate; current battle implementation should support this interface.
+- current Victory and Defeat both stop battle BGM immediately.

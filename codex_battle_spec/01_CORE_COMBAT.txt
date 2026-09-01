@@ -1,0 +1,131 @@
+CORE COMBAT SPECIFICATION
+=========================
+
+BATTLE FORMAT
+-------------
+- Separate generic Battle scene; normal battles should not require bespoke .tscn files.
+- Exploration scene is stopped while Battle scene is active.
+- Battle receives setup data: enemy list, background, optional BGM etc.
+- Default battle BGM is "Basic Battle BGM 1" (the provided 8-bit track if present in project).
+- Normal enemy count: 1–3.
+- Internal enemy storage MUST NOT hardcode a maximum of 3. Boss/special encounters may exceed it.
+- Normal placement:
+  1 enemy: center
+  2 enemies: left/right; initial target = left
+  3 enemies: left/center/right; initial target = center
+- Dead enemy slots remain empty; do not compact positions.
+- On target death, select next living target using a stable left-to-right rule.
+
+BATTLE STATES
+-------------
+Minimum battle-level states:
+STARTING / ACTIVE / VICTORY / DEFEAT
+
+STARTING:
+- approximately 0.5 s.
+- enemy attack timers do not advance.
+- player CAN input/cast during this short opening.
+- BGM begins immediately.
+- no "BATTLE START" text required.
+
+ACTIVE:
+- all normal real-time systems run.
+
+VICTORY:
+- triggered immediately when all enemies are dead.
+- cancel enemy attacks/AI.
+- player input locks.
+- BGM stops immediately.
+- remain on result/retry state for current test implementation.
+
+DEFEAT:
+- triggered immediately at player HP <= 0.
+- player input locks.
+- enemy AI stops.
+- in-progress player spell presentation is cancelled.
+- BGM stops immediately.
+- darken screen and show DEFEAT + Retry.
+- no exit button required in current test battle.
+
+PLAYER
+------
+- no movement in combat.
+- controls are rune casting, target selection, cancellation, and Algiz parry.
+- future dodge/jump exists conceptually but MUST NOT be implemented now.
+- max HP initial: 100.
+- current HP initial: 100 in test battle.
+- Magic Power initial: 10.
+- Magic Power is NOT mana and is NOT consumed.
+- no defense stat for now.
+- spells are unlimited.
+- future equipment may modify HP/Magic Power/resistance/casting/parry, but current equipment modifiers must remain disconnected from active combat.
+
+DAMAGE FORMULA
+--------------
+Current temporary Magic Power formula:
+  mp_scaled_damage = base_damage * (1 + magic_power / 100.0)
+
+Then apply relevant spell/perfect/resistance logic.
+Final displayed/applied integer damage is FLOORed, not rounded.
+
+The calculation should live in a centralized/resolvable function so the formula can be changed later without rewriting spells.
+
+PERFECT:
+- each PERFECT in the currently built combo increments perfect_count.
+- final spell damage multiplier = 1.5 ^ perfect_count.
+- examples: one P = x1.5; two P = x2.25.
+- do not record which rune caused the P; only the count is needed.
+- no ordinary random critical-hit system.
+
+PLAYER HIT
+----------
+Normal damaging hit:
+- apply damage.
+- clear active casting.
+- clear entire built combo.
+- clear perfect_count.
+- clear fusion display.
+- cancel active parry stance.
+- hitstun: 0.2 s.
+- invulnerability: total 0.6 s from the original damaging hit.
+- after 0.2 s, player may cast/parry during the remaining ~0.4 s of invulnerability.
+- target selection remains unchanged.
+- ordinary hit visual: light screen shake, player damage number, HP reaction.
+
+INVULNERABILITY:
+- an attack can still geometrically/logically hit during i-frames, but damage = 0.
+- such an invulnerable hit must NOT clear the player's combo/casting.
+- it DOES cancel an active parry stance.
+- most importantly: it MUST NOT restart or extend the 0.6 s invulnerability timer.
+- avoid accidental infinite i-frame extension from rapid attacks.
+
+INPUT EVENT PRIORITY / SAME-FRAME CASES
+---------------------------------------
+Explicitly resolve competing events. Important intended outcomes:
+- a spell whose Enter activation is accepted in the same frame as incoming damage is considered launched; then the player can be hit.
+- successful parry beats the corresponding hit.
+- death supersedes continued interaction.
+- Algiz has higher input priority than X if both are newly pressed in exactly the same frame (as specified in Q&A).
+- avoid implementation-order-dependent behavior.
+
+A sensible explicit processing policy should preserve:
+spell activation acceptance > parry resolution > damaging hit > Algiz > X > other inputs,
+while death checks terminate subsequent player actions.
+
+BATTLE RESULT / STATS
+---------------------
+Prepare BattleResult-style runtime data for future integration:
+- victory
+- remaining_hp
+- defeated_enemy_ids
+- battle duration
+- perfect count/statistics
+- parry count
+- hit count
+- spell-use counts
+No reward UI is needed now.
+XP, level, loot and rune drops are NOT part of this implementation.
+
+RETURN TO EXPLORATION
+---------------------
+Architecture should support returning to the originating exploration scene and carrying remaining HP/results, but the test battle may simply wait for Retry.

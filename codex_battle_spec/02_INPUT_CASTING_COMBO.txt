@@ -1,0 +1,153 @@
+INPUT, CASTING GAUGE, COMBO, TARGETING
+=====================================
+
+LOADOUT / RUNES IMPLEMENTED NOW
+-------------------------------
+Active runtime rune implementation:
+- Algiz (parry)
+- Fire / Kenaz
+- Water / Laguz
+- Lightning / Hagalaz
+- Grass / Ingwaz
+
+The broader game may contain 24 runes. Do NOT invent behavior/data for unimplemented runes.
+
+COMBO RULES
+-----------
+- first rune of an offensive spell MUST be an element.
+- current four elements: Fire, Water, Lightning, Grass.
+- single-element spells are valid.
+- different elements may be combined.
+- current max_combo = 2.
+- NEVER hardcode logic/UI around 2. max_combo must be data-driven and work when changed to 3 or 4 without code rewrite.
+- normal intended late-game maximum is about 4.
+- duplicate rune inside one combo is currently forbidden.
+- rune order is currently commutative/order-independent:
+  Fire+Water == Water+Fire.
+- spell validity is checked BEFORE starting the next rune's casting gauge.
+- invalid combinations do not start casting; use a light rejection response/SE hook.
+- non-element as first offensive rune is rejected.
+- when max_combo is full, additional rune inputs are rejected until Enter fires or X clears.
+
+COMBO STORAGE
+-------------
+Keep:
+- ordered/current RuneData references or IDs for UI
+- normalized unordered lookup key for SpellDB
+- perfect_count integer
+Do not over-store NORMAL/PERFECT history unless useful for UI.
+
+CASTING FLOW
+------------
+Basic rhythm:
+Rune key
+ -> casting gauge begins
+ -> Enter judges timing
+ -> successful rune enters combo
+ -> optional next Rune
+ -> Enter judges timing
+ -> when not casting, Left/Right can select target
+ -> Enter fires the completed spell
+ -> immediately begin building next combo when allowed
+
+During casting:
+- enemies continue acting.
+- target selection is disabled.
+- other normal rune keys are ignored.
+- Algiz is ignored.
+- Enter is the timing/judgement input.
+- X clears active casting + the entire already-built combo.
+- Enter held/repeat must NOT auto-judge future casts. Require fresh key press.
+- key-repeat must not create duplicate actions.
+
+CASTING GAUGE — PATTERN 1
+-------------------------
+Current four elements may all share Pattern 1 for now, but architecture must allow radically different per-rune patterns later:
+- different direction
+- P/N/MISS placement
+- acceleration/deceleration
+- different visual shape
+- vertical/circular/etc.
+Do not build a giant universal pattern framework, but do not bake RuneCaster exclusively into one horizontal bar either.
+
+Pattern 1:
+- horizontal gauge.
+- total traversal behavior: two full round trips.
+- approximate total duration: 2.0 seconds.
+- cursor starts at a RANDOM position inside a MISS region.
+- current implementation can use the common symmetric band proportions:
+  MISS 20% | NORMAL 27% | PERFECT 6% | NORMAL 27% | MISS 20%
+- left/right symmetry for Pattern 1.
+- PERFECT central region corresponds roughly to 8 frames at 60 Hz (~0.133 s), but implementation MUST be time-based/FPS-independent.
+- cursor traverses back and forth.
+- after two round trips without Enter, automatic MISS.
+- pressing Enter while cursor is:
+  NORMAL -> success, add rune
+  PERFECT -> success, add rune and perfect_count += 1
+  MISS -> failure
+- NORMAL has no graded strength.
+- any traversal pass through PERFECT is equivalent.
+
+MISS:
+- IMPORTANT FINAL SPEC: MISS does NOT cause an old-combo "wild cast".
+- MISS deletes the current attempted rune AND all previously built combo runes.
+- first-rune MISS likewise resets.
+- no damage/spell activation.
+- small red MISS text is sufficient.
+- no heavy failure animation/SE required.
+- ~0.1 s natural recovery before a new cast is acceptable.
+
+X CANCEL:
+- no gameplay penalty.
+- clears current casting + entire combo + perfect_count.
+- no red MISS effect.
+
+GAUGE UI
+--------
+- gauge frame exists while idle but is extremely dark/faint.
+- rune input causes assertive fade-in.
+- show current rune name and rune image.
+- after judgement, fade back down.
+- NORMAL: ordinary white text.
+- PERFECT: clear PERFECT text, satisfying flash/SE.
+- MISS: small red text.
+- PERFECT xN display only from x2 upward.
+- combo slots always derive from max_combo.
+- current max 2 -> two slots.
+- changing max_combo to 3/4 auto-generates 3/4 slots.
+- successful rune inserts its symbol into the slot.
+- NORMAL has light white response.
+- PERFECT slot response is stronger.
+- X/MISS/hit clears slot presentation appropriately.
+
+TARGET SELECTION
+----------------
+- Left/Right only when NOT currently casting.
+- Up/Down are not normal target-selection keys.
+- Algiz mode repurposes arrow keys for parry direction; this separation must be explicit.
+- target can be selected once at least one offensive rune is successfully built.
+- target outline is shown only while a valid built combo exists / spell can be prepared for firing.
+- no target outline during completely empty idle state.
+- selected enemy outline: thin, dim/light red line tracing sprite if practical.
+- prefer shader outline; if existing asset constraints make it unsafe, use a clean fallback, but do not permanently design around a crude rectangle.
+- target outline remains through combo building when applicable.
+- firing clears combo and therefore hides outline until another combo exists.
+- target identity itself is retained across attacks until enemy death.
+- target-change SE hook.
+
+TARGET INITIALIZATION
+---------------------
+1 enemy: center/only enemy.
+2 enemies: left enemy.
+3 enemies: center enemy.
+On target death: choose next living enemy with stable left-to-right preference.
+
+SPELL ACTIVATION LOCK
+---------------------
+Player offensive spell presentation has an independent activation/cast lock, not an overloaded player input state.
+- after final Enter to fire, begin hand-side activation.
+- player may start BUILDING a subsequent combo as soon as normal input rules permit.
+- however, another completed spell may NOT be fired with Enter while the previous spell is still in its hand-side activation phase.
+- once the previous spell begins its enemy-side effect/damage presentation, the next completed spell may be fired.
+- therefore only ONE hand-origin activation sprite/effect exists at a time.
+- show disabled/dim Enter prompt while activation-locked.

@@ -1,0 +1,49 @@
+RUNE GAME — CODEX IMPLEMENTATION PACKAGE
+=========================================
+
+PURPOSE
+-------
+Implement the first complete playable real-time rune-combat foundation in the EXISTING Godot project.
+
+IMPORTANT WORKFLOW
+------------------
+1. Inspect the existing project BEFORE changing architecture:
+   - project.godot / Godot version
+   - InputMap
+   - Autoloads
+   - scenes and scripts
+   - existing rune/player/save/audio systems
+   - existing rune symbol assets, stone-circle/silver-frame assets, enemy assets
+   - battle BGM location
+2. Adapt this specification to the existing project instead of replacing working systems.
+3. Do not ask about trivial structural differences. Resolve them sensibly.
+4. If this specification fundamentally conflicts with existing working architecture, preserve the existing project and report the conflict rather than destructively rewriting it.
+5. Do not rename/move existing assets unless absolutely necessary.
+6. Do not download external assets or install plugins.
+7. Use Godot-standard functionality.
+8. Implement the complete scope, then run parser/import/runtime/smoke checks as far as the environment permits.
+9. Do not leave core requested behavior as TODOs.
+
+DESIGN PRINCIPLE
+----------------
+This is NOT a turn-based command RPG. Combat is a real-time technical duel inspired primarily by Sekiro-style pressure:
+- enemies continue attacking while the player casts;
+- spells consume no mana;
+- parry consumes no resource;
+- player limitations are TIME, INPUT ACCURACY, and ENEMY PRESSURE;
+- long combos are stronger but expose the player to more casting/MISS/interruption risk;
+- there is NO ultimate/special gauge;
+- large openings are earned by handling enemy attacks, especially parries.
+
+READ ALL FILES IN THIS PACKAGE BEFORE IMPLEMENTATION.
+
+Files:
+01_CORE_COMBAT.txt
+02_INPUT_CASTING_COMBO.txt
+03_PARRY_ENEMY_AI.txt
+04_SPELLS_DAMAGE_STATUS.txt
+05_UI_VISUAL_AUDIO.txt
+06_DATA_ARCHITECTURE.txt
+07_LOADOUT_KNOWLEDGE_FUTURE.txt
+08_DEBUG_TEST_ACCEPTANCE.txt
+09_CODEX_EXECUTION_PROMPT.txt
