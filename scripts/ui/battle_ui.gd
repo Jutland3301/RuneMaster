@@ -337,25 +337,33 @@ func _create_enemy_ui(
 	enemy_layer.add_child(ui)
 	ui.setup(enemy, knowledge)
 
-	var x_ratio := _get_enemy_x_ratio(index, count)
+	# この計算を維持することで、何体でも中心が等間隔になる。
+	var x_ratio := _get_enemy_x_ratio(
+		index,
+		count
+	)
 
-	# EnemyUI の「中心」を x_ratio の位置に置く
+	# 1920x648の戦闘領域内で、共通の床ラインに置く。
+	var floor_ratio := 0.90
+
 	ui.anchor_left = x_ratio
 	ui.anchor_right = x_ratio
-	ui.anchor_top = 0.28
-	ui.anchor_bottom = 0.28
+	ui.anchor_top = floor_ratio
+	ui.anchor_bottom = floor_ratio
 
-	# EnemyUI 自身が持つ必要サイズを使う。
-	# BattleUI 側では 260x300 等をハードコードしない。
-	var ui_size := ui.get_combined_minimum_size()
+	var ui_size := (
+		ui.get_combined_minimum_size()
+	)
 
 	ui.offset_left = -ui_size.x * 0.5
 	ui.offset_right = ui_size.x * 0.5
-	ui.offset_top = 0.0
-	ui.offset_bottom = ui_size.y
+
+	# EnemyUIの下端を床ラインへ固定。
+	# 拡大しても足元は下へずれない。
+	ui.offset_top = -ui_size.y
+	ui.offset_bottom = 0.0
 
 	enemy_uis[enemy] = ui
-
 
 func _get_enemy_x_ratio(
 	index: int,
@@ -366,14 +374,22 @@ func _get_enemy_x_ratio(
 			return 0.5
 
 		2:
-			return [0.33, 0.67][index]
+			return [0.36, 0.64][index]
 
 		3:
-			return [0.18, 0.50, 0.82][index]
+			return [0.22, 0.50, 0.78][index]
 
 		_:
-			return float(index + 1) / float(count + 1)
+			var normal_ratio := (
+				float(index + 1)
+				/ float(count + 1)
+			)
 
+			return (
+				0.5
+				+ (normal_ratio - 0.5) * 0.88
+			)
+			
 func refresh_targets(test_battle) -> void:
 	_refresh_targets(test_battle)
 

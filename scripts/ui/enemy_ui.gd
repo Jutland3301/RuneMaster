@@ -12,11 +12,20 @@ var target_frame: Panel
 var hover_ui: EnemyHoverUI
 var status_marks: HBoxContainer
 
+const UI_WIDTH := 260.0
+const BODY_FLOOR_Y := 380.0
+const BODY_SCALE := 1.5
+
+const SPRITE_BASE_SIZE := Vector2(200, 210)
+const COLOR_BODY_BASE_SIZE := Vector2(154, 174)
 
 func setup(p_enemy: BattleEnemy, p_knowledge: ResistanceKnowledge) -> void:
 	enemy = p_enemy
 	knowledge = p_knowledge
-	custom_minimum_size = Vector2(260, 300)
+	custom_minimum_size = Vector2(
+	UI_WIDTH,
+	BODY_FLOOR_Y
+	)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build()
 
@@ -64,37 +73,80 @@ func _build() -> void:
 	add_child(status_marks)
 
 	target_frame = Panel.new()
-	target_frame.position = Vector2(43, 72)
-	target_frame.size = Vector2(174, 194)
+
+	var sprite_size := (
+		SPRITE_BASE_SIZE * BODY_SCALE
+	)
+
+	var sprite_position := Vector2(
+		(UI_WIDTH - sprite_size.x) * 0.5,
+		BODY_FLOOR_Y - sprite_size.y
+	)
+
+	target_frame.position = (
+		sprite_position - Vector2(6, 6)
+	)
+	target_frame.size = (
+		sprite_size + Vector2(12, 12)
+	)
 	target_frame.visible = false
+
 	var outline := StyleBoxFlat.new()
 	outline.bg_color = Color(0, 0, 0, 0)
-	outline.border_color = Color(0.75, 0.12, 0.12, 0.72)
+	outline.border_color = Color(
+		0.75,
+		0.12,
+		0.12,
+		0.72
+	)
 	outline.set_border_width_all(2)
-	target_frame.add_theme_stylebox_override("panel", outline)
+
+	target_frame.add_theme_stylebox_override(
+		"panel",
+		outline
+	)
 	add_child(target_frame)
 
 	if enemy.data.sprite != null:
 		var sprite := TextureRect.new()
 
-		sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		sprite.expand_mode = (
+			TextureRect.EXPAND_IGNORE_SIZE
+		)
+		sprite.stretch_mode = (
+			TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		)
 
 		sprite.texture = enemy.data.sprite
-		sprite.position = Vector2(30, 65)
-		sprite.size = Vector2(200, 210)
+		sprite.position = sprite_position
+		sprite.size = sprite_size
 
 		body = sprite
+
 	else:
+		var color_body_size := (
+			COLOR_BODY_BASE_SIZE * BODY_SCALE
+		)
+
 		body_color = ColorRect.new()
-		body_color.color = enemy.data.presentation_color
-		body_color.position = Vector2(53, 82)
-		body_color.size = Vector2(154, 174)
+		body_color.color = (
+			enemy.data.presentation_color
+		)
+		body_color.position = Vector2(
+			(UI_WIDTH - color_body_size.x) * 0.5,
+			BODY_FLOOR_Y - color_body_size.y
+		)
+		body_color.size = color_body_size
+
 		body = body_color
 
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(body)
-	move_child(target_frame, get_child_count() - 1)
+
+	move_child(
+		target_frame,
+		get_child_count() - 1
+	)
 
 	hover_ui = EnemyHoverUI.new()
 	hover_ui.position = Vector2(-5, 68)
@@ -219,6 +271,45 @@ func _refresh_status_marks() -> void:
 
 func _start_idle_motion() -> void:
 	var base_y := body.position.y
-	var tween := create_tween().set_loops()
-	tween.tween_property(body, "position:y", base_y - 4.0, 1.2).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(body, "position:y", base_y + 2.0, 1.2).set_trans(Tween.TRANS_SINE)
+
+	# 敵ごとに一度だけ抽選する。
+	# 毎フレーム乱数を使わないため、動きは滑らか。
+	var rise_amount := randf_range(3.2, 5.0)
+	var fall_amount := randf_range(1.2, 2.8)
+
+	var rise_duration := randf_range(1.05, 1.38)
+	var fall_duration := randf_range(1.08, 1.42)
+
+	# 全員が同じ瞬間から同じ位相で動くのを防ぐ。
+	body.position.y = (
+		base_y
+		+ randf_range(
+			-rise_amount * 0.45,
+			fall_amount * 0.45
+		)
+	)
+
+	var tween := create_tween()
+	tween.set_loops()
+
+	tween.tween_property(
+		body,
+		"position:y",
+		base_y - rise_amount,
+		rise_duration
+	).set_trans(
+		Tween.TRANS_SINE
+	).set_ease(
+		Tween.EASE_IN_OUT
+	)
+
+	tween.tween_property(
+		body,
+		"position:y",
+		base_y + fall_amount,
+		fall_duration
+	).set_trans(
+		Tween.TRANS_SINE
+	).set_ease(
+		Tween.EASE_IN_OUT
+	)

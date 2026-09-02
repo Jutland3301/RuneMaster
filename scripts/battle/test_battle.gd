@@ -65,7 +65,8 @@ func _ready() -> void:
 
 	persistent_data = SaveSystem.load_player()
 	persistent_data.validate_loadout()
-
+	# Debug battle always starts at full HP.
+	persistent_data.current_hp = persistent_data.max_hp
 	resistance_knowledge = ResistanceKnowledge.new()
 	resistance_knowledge.setup(
 		persistent_data.resistance_knowledge
@@ -865,7 +866,8 @@ func _build_battle_result(
 		spell_use_counts.duplicate(true)
 	)
 
-	persistent_data.current_hp = player.hp
+	# TestBattle damage must not persist outside the debug fight.
+	persistent_data.current_hp = persistent_data.max_hp
 	SaveSystem.save_player(persistent_data)
 
 	print("----- BATTLE RESULT -----")
