@@ -70,10 +70,7 @@ func update_combo(
 	combo: Array[RuneData],
 	spell: SpellData
 ) -> void:
-	for symbol in rune_symbols:
-		symbol.queue_free()
-
-	rune_symbols.clear()
+	_clear_symbols()
 
 	var names: Array[String] = []
 
@@ -95,6 +92,40 @@ func update_combo(
 	var fused_color := _get_fused_color(combo)
 
 	_flash_fusion_color(fused_color)
+
+
+func show_parry(
+	algiz: RuneData,
+	direction: EnemyAttackEvent.ParryDirection
+) -> void:
+	_clear_symbols()
+
+	_add_rune_symbol(algiz)
+
+	var direction_name := String(
+		EnemyAttackEvent.ParryDirection.keys()[direction]
+	)
+
+	# FRONT is the unfused Algiz stance. A directional stance visually
+	# combines Algiz with its arrow in the same fusion circle.
+	if direction != EnemyAttackEvent.ParryDirection.FRONT:
+		_add_direction_symbol(direction, algiz.rune_color)
+
+	spell_label.text = "PARRY"
+	component_label.text = (
+		algiz.display_name
+		if direction == EnemyAttackEvent.ParryDirection.FRONT
+		else algiz.display_name + "  +  " + direction_name
+	)
+
+	_flash_fusion_color(algiz.rune_color.lightened(0.18))
+
+
+func _clear_symbols() -> void:
+	for symbol in rune_symbols:
+		symbol.queue_free()
+
+	rune_symbols.clear()
 
 func flash_fire() -> void:
 	var flash := ColorRect.new()
@@ -196,6 +227,60 @@ func _add_rune_symbol(
 
 	symbol_layer.add_child(symbol)
 	rune_symbols.append(symbol)
+
+
+func _add_direction_symbol(
+	direction: EnemyAttackEvent.ParryDirection,
+	color: Color
+) -> void:
+	var direction_label := Label.new()
+	direction_label.text = {
+		EnemyAttackEvent.ParryDirection.UP: "↑",
+		EnemyAttackEvent.ParryDirection.DOWN: "↓",
+		EnemyAttackEvent.ParryDirection.LEFT: "←",
+		EnemyAttackEvent.ParryDirection.RIGHT: "→",
+	}.get(direction, "")
+
+	direction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	direction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	direction_label.add_theme_font_size_override("font_size", 64)
+	direction_label.add_theme_color_override(
+		"font_color",
+		color.lightened(0.35)
+	)
+	direction_label.add_theme_color_override(
+		"font_outline_color",
+		Color(0.04, 0.04, 0.05, 0.9)
+	)
+	direction_label.add_theme_constant_override("outline_size", 5)
+
+	var center_x := 0.5
+	var center_y := 0.34
+	var half_size := 0.11
+	var offset := Vector2.ZERO
+
+	match direction:
+		EnemyAttackEvent.ParryDirection.UP:
+			offset.y = -0.21
+		EnemyAttackEvent.ParryDirection.DOWN:
+			offset.y = 0.21
+		EnemyAttackEvent.ParryDirection.LEFT:
+			offset.x = -0.22
+		EnemyAttackEvent.ParryDirection.RIGHT:
+			offset.x = 0.22
+
+	direction_label.anchor_left = center_x + offset.x - half_size
+	direction_label.anchor_right = center_x + offset.x + half_size
+	direction_label.anchor_top = center_y + offset.y - half_size
+	direction_label.anchor_bottom = center_y + offset.y + half_size
+	direction_label.offset_left = 0.0
+	direction_label.offset_top = 0.0
+	direction_label.offset_right = 0.0
+	direction_label.offset_bottom = 0.0
+	direction_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	symbol_layer.add_child(direction_label)
+	rune_symbols.append(direction_label)
 
 func _get_fused_color(combo: Array[RuneData]) -> Color:
 	if combo.is_empty():

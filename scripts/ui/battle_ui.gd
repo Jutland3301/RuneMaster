@@ -1,6 +1,8 @@
 class_name BattleUI
 extends CanvasLayer
 
+const ALGIZ_RUNE: RuneData = preload("res://data/runes/algiz.tres")
+
 var root: Control
 
 var world_panel: ColorRect
@@ -505,11 +507,22 @@ func _on_parry_changed(
 		direction_name
 	)
 
+	fusion_ui.show_parry(
+		ALGIZ_RUNE,
+		direction as EnemyAttackEvent.ParryDirection
+	)
+
 
 func _on_parry_cleared() -> void:
 	casting_ui.show_parry(
 		false,
 		""
+	)
+
+	var combo: Array[RuneData] = battle_ref.rune_caster.combo
+	fusion_ui.update_combo(
+		combo,
+		battle_ref.rune_caster.get_current_spell()
 	)
 
 

@@ -1,6 +1,14 @@
 [gd_scene format=3 uid="uid://dpmmsgmmfi1g2"]
 
 [ext_resource type="Script" uid="uid://0h1hgev8opv" path="res://scripts/battle/test_battle.gd" id="1_lghx1"]
+[ext_resource type="Script" uid="uid://ctqi88ju6cf5r" path="res://scripts/battle/battle_audio.gd" id="2_teaa6"]
+[ext_resource type="Resource" uid="uid://dqfannx7unweu" path="res://data/battles/test_battle_setup.tres" id="2_xkjlo"]
+[ext_resource type="AudioStream" uid="uid://brl3brx7dngwr" path="res://assets/audio/snowy-ambush-128-ytshorts.savetube.me.mp3" id="3_xkjlo"]
 
 [node name="TestBattle" type="Node" unique_id=720104457]
 script = ExtResource("1_lghx1")
+battle_setup = ExtResource("2_xkjlo")
+
+[node name="BattleAudio" type="Node" parent="." unique_id=1474276691]
+script = ExtResource("2_teaa6")
+bgm_stream = ExtResource("3_xkjlo")

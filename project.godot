@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="RuneMaster"
-run/main_scene="uid://dpmmsgmmfi1g2"
+run/main_scene="uid://g6j42jhb51n8"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 

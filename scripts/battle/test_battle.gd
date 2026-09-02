@@ -33,8 +33,10 @@ var keybind_manager: KeybindManager
 var loadout_ui: LoadoutKeybindUI
 var debug_overlay: DebugOverlay
 var battle_result: BattleResult
-var battle_setup: BattleSetup
-var battle_audio: BattleAudio
+@export var battle_setup: BattleSetup
+@onready var battle_audio: BattleAudio = get_node(
+	"BattleAudio"
+) as BattleAudio
 
 var total_perfects: int = 0
 var parry_count: int = 0
@@ -43,15 +45,23 @@ var player_hit_count: int = 0
 var spell_use_counts: Dictionary = {}
 var defeated_enemy_ids: Array[StringName] = []
 
+
+
 func _ready() -> void:
 	if has_queued_rng_seed:
 		rng_seed = queued_rng_seed
 
 	battle_result = BattleResult.new()
-	battle_setup = BattleSetup.consume_queued()
+	var queued_setup := BattleSetup.consume_queued()
+
+	if queued_setup != null:
+		battle_setup = queued_setup
 
 	if battle_setup == null:
-		battle_setup = _create_default_test_setup()
+		push_error(
+			"TestBattle: BattleSetup is not assigned."
+		)
+		return
 
 	persistent_data = SaveSystem.load_player()
 	persistent_data.validate_loadout()
@@ -128,11 +138,6 @@ func _create_runtime_nodes() -> void:
 	player_status = StatusEffectController.new()
 	player_status.name = "PlayerStatus"
 	add_child(player_status)
-
-	battle_audio = BattleAudio.new()
-	battle_audio.name = "BattleAudio"
-	add_child(battle_audio)
-	battle_audio.setup(battle_setup.bgm)
 
 	battle_manager.register_player(player)
 

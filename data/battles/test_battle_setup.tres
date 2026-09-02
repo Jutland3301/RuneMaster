@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BattleSetup" format=3 uid="uid://dqfannx7unweu"]
+
+[ext_resource type="Script" uid="uid://b3wnvbqprkb7s" path="res://scripts/core/battle_setup.gd" id="1_ij211"]
+[ext_resource type="Texture2D" uid="uid://dlix4oo5ysbkt" path="res://assets/backgrounds/ChatGPT Image Sep 2, 2026, 08_42_44 PM (1).png" id="1_qywtd"]
+[ext_resource type="Script" uid="uid://c3wxua420qv55" path="res://scripts/data/enemy_data.gd" id="2_g804n"]
+[ext_resource type="Resource" uid="uid://cq5034p4dya5m" path="res://data/enemies/test_enemy_a.tres" id="3_csw26"]
+[ext_resource type="Resource" uid="uid://dbcjpfcx3mfv0" path="res://data/enemies/test_enemy_b.tres" id="4_rmh2y"]
+[ext_resource type="Resource" uid="uid://c6h7704x03c46" path="res://data/enemies/test_enemy_c.tres" id="5_5lcmo"]
+
+[resource]
+script = ExtResource("1_ij211")
+enemies = Array[ExtResource("2_g804n")]([ExtResource("3_csw26"), ExtResource("4_rmh2y"), ExtResource("5_5lcmo")])
+background = ExtResource("1_qywtd")

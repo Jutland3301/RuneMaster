@@ -1,14 +1,15 @@
 class_name BattleSetup
-extends RefCounted
+extends Resource
 
 static var pending_setup: BattleSetup = null
 
-var enemies: Array[EnemyData] = []
+@export_category("Battle")
+@export var enemies: Array[EnemyData] = []
+@export var background: Texture2D
 
-var background: Texture2D = null
-var bgm: AudioStream = null
+@export_category("Navigation")
+@export_file("*.tscn") var origin_scene_path: String = ""
 
-var origin_scene_path: String = ""
 var special_metadata: Dictionary = {}
 
 
@@ -18,7 +19,9 @@ func _init(
 	enemies = p_enemies
 
 
-static func queue_for_next_battle(setup: BattleSetup) -> void:
+static func queue_for_next_battle(
+	setup: BattleSetup
+) -> void:
 	pending_setup = setup
 
 
