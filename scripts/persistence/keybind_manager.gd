@@ -41,7 +41,9 @@ const RESERVED_KEYS: Array[Key] = [
 	KEY_RIGHT,
 	KEY_UP,
 	KEY_DOWN,
-	KEY_ESCAPE
+	KEY_ESCAPE,
+	KEY_TAB,
+	KEY_F3
 ]
 
 

@@ -1,3 +1,11 @@
-[gd_resource type="TextMesh" format=3 uid="uid://bc8t58lvy42vx"]
+[gd_resource type="Resource" script_class="RuneData" format=3 uid="uid://bc8t58lvy42vx"]
+
+[ext_resource type="Script" uid="uid://csda66kipwj1" path="res://scripts/data/rune_data.gd" id="1_rune"]
+[ext_resource type="Texture2D" uid="uid://df4agfikoq8i2" path="res://assets/runes/Algiz.png" id="2_l4oxo"]
 
 [resource]
+script = ExtResource("1_rune")
+id = &"algiz"
+display_name = "Algiz"
+texture = ExtResource("2_l4oxo")
+rune_color = Color(0.78039217, 0.49019608, 1, 1)

@@ -1,3 +1,14 @@
-[gd_resource type="TextMesh" format=3 uid="uid://s7h150lcu2j8"]
+[gd_resource type="Resource" script_class="RuneData" format=3 uid="uid://s7h150lcu2j8"]
+
+[ext_resource type="Script" uid="uid://csda66kipwj1" path="res://scripts/data/rune_data.gd" id="1_rune"]
+[ext_resource type="Resource" uid="uid://dr048g5ynnvrq" path="res://data/patterns/pattern1.tres" id="2_pattern"]
+[ext_resource type="Texture2D" uid="uid://0t28q0sy5wd4" path="res://assets/runes/Ingwaz.png" id="3_6yide"]
 
 [resource]
+script = ExtResource("1_rune")
+id = &"grass"
+display_name = "Ingwaz / Grass"
+texture = ExtResource("3_6yide")
+rune_color = Color(1.8169359e-06, 0.44536918, 0.16361967, 1)
+is_element = true
+casting_pattern = ExtResource("2_pattern")

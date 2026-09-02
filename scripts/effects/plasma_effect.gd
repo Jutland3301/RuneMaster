@@ -8,6 +8,12 @@ const HIT_BASE_DAMAGE: Array[float] = [
 	90.0
 ]
 
+const HIT_DELAYS: Array[float] = [
+	0.0,
+	0.12,
+	0.28
+]
+
 
 func execute(
 	event: PlayerAttackEvent,
@@ -24,17 +30,9 @@ func execute(
 	if not target.is_alive():
 		return
 
-	# Current logic resolves all three logical hits here.
-	# UI presentation later staggers the visible zan/zan/ZAN response.
-	for base_damage in HIT_BASE_DAMAGE:
-		if not is_instance_valid(target):
-			break
-
-		if not target.is_alive():
-			break
-
-		executor.apply_direct_spell_damage(
-			event,
-			target,
-			base_damage
-		)
+	executor.queue_damage_sequence(
+		event,
+		target,
+		HIT_BASE_DAMAGE,
+		HIT_DELAYS
+	)

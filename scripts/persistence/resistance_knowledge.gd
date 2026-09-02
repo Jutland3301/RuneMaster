@@ -76,6 +76,5 @@ func get_display(
 	):
 		return "???"
 
-	return "x%.2f" % enemy.get_resistance(
-		attribute_id
-	)
+	var value := enemy.get_resistance(attribute_id)
+	return "x%s" % String.num(value, 2)

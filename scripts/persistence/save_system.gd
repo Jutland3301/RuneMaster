@@ -20,7 +20,8 @@ static func save_player(
 		),
 		"keybinds": data.keybinds,
 		"resistance_knowledge":
-			data.resistance_knowledge
+			data.resistance_knowledge,
+		"equipment": data.equipment
 	}
 
 	var file := FileAccess.open(
@@ -130,6 +131,13 @@ static func load_player() -> PlayerPersistentData:
 		data.resistance_knowledge = (
 			loaded_knowledge
 		)
+
+	var loaded_equipment = payload.get("equipment", {})
+
+	if typeof(loaded_equipment) == TYPE_DICTIONARY:
+		data.equipment = loaded_equipment
+
+	data.validate_loadout()
 
 	return data
 

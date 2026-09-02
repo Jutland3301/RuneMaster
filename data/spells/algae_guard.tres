@@ -1,3 +1,14 @@
-[gd_resource type="TextMesh" format=3 uid="uid://b3fba8cskbjt8"]
-
+[gd_resource type="Resource" script_class="SpellData" load_steps=3 format=3 uid="uid://b3fba8cskbjt8"]
+[ext_resource type="Script" path="res://scripts/data/spell_data.gd" id="1_spell"]
+[ext_resource type="Script" path="res://scripts/effects/algae_guard_effect.gd" id="2_effect"]
 [resource]
+script = ExtResource("1_spell")
+id = &"algae_guard"
+display_name = "Algae Guard"
+required_runes = Array[StringName]([&"water", &"grass"])
+base_damage = 0.0
+attribute_id = &"algae_guard"
+activation_time = 0.3
+target_mode = 3
+effect_script = ExtResource("2_effect")
+effect_color = Color(0.18, 0.72, 0.48, 1)

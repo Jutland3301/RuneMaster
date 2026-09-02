@@ -21,3 +21,4 @@ enum TargetMode {
 @export var target_mode: TargetMode = TargetMode.SINGLE_ENEMY
 
 @export var effect_script: Script
+@export var effect_color: Color = Color.WHITE

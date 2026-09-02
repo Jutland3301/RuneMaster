@@ -13,9 +13,12 @@ var cursor: ColorRect
 var rune_label: Label
 var judgement_label: Label
 var combo_label: Label
+var combo_slots: HBoxContainer
 var perfect_label: Label
 var enter_label: Label
 var parry_label: Label
+var rune_texture: TextureRect
+var gauge_parts: Array[CanvasItem] = []
 
 
 func _ready() -> void:
@@ -32,11 +35,19 @@ func _build() -> void:
 	rune_label.text = ""
 	add_child(rune_label)
 
+	rune_texture = TextureRect.new()
+	rune_texture.position = Vector2(8, 35)
+	rune_texture.size = Vector2(36, 52)
+	rune_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rune_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	add_child(rune_texture)
+
 	gauge_background = ColorRect.new()
 	gauge_background.position = Vector2(50, 50)
 	gauge_background.size = Vector2(600, 34)
 	gauge_background.color = Color(0.06, 0.06, 0.07)
 	add_child(gauge_background)
+	gauge_parts.append(gauge_background)
 
 	miss_left = _make_band(
 		Vector2(50, 50),
@@ -74,6 +85,12 @@ func _build() -> void:
 	cursor.color = Color.WHITE
 	cursor.visible = false
 	add_child(cursor)
+	gauge_parts.append(cursor)
+
+	for band in [miss_left, normal_left, perfect_band, normal_right, miss_right]:
+		gauge_parts.append(band)
+
+	_set_gauge_alpha(0.18)
 
 	judgement_label = Label.new()
 	judgement_label.position = Vector2(0, 95)
@@ -81,12 +98,12 @@ func _build() -> void:
 	judgement_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(judgement_label)
 
-	combo_label = Label.new()
-	combo_label.position = Vector2(0, 135)
-	combo_label.size = Vector2(700, 30)
-	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	combo_label.text = "[ empty ]  [ empty ]"
-	add_child(combo_label)
+	combo_slots = HBoxContainer.new()
+	combo_slots.position = Vector2(0, 130)
+	combo_slots.size = Vector2(700, 42)
+	combo_slots.alignment = BoxContainer.ALIGNMENT_CENTER
+	combo_slots.add_theme_constant_override("separation", 8)
+	add_child(combo_slots)
 
 	perfect_label = Label.new()
 	perfect_label.position = Vector2(0, 170)
@@ -127,10 +144,10 @@ func _make_band(
 
 func show_cast_start(rune: RuneData) -> void:
 	rune_label.text = rune.display_name
+	rune_texture.texture = rune.texture
 	judgement_label.text = ""
 	cursor.visible = true
-
-	modulate.a = 1.0
+	_set_gauge_alpha(1.0)
 
 
 func update_cursor(
@@ -155,9 +172,11 @@ func show_judgement(
 	match judgement:
 		&"perfect":
 			judgement_label.text = "PERFECT"
+			judgement_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
 
 		&"normal":
 			judgement_label.text = "NORMAL"
+			judgement_label.add_theme_color_override("font_color", Color.WHITE)
 
 		&"miss":
 			judgement_label.text = "MISS"
@@ -166,11 +185,26 @@ func show_judgement(
 			judgement_label.text = ""
 
 	cursor.visible = false
+	_fade_gauge_idle()
 
 
 func show_miss() -> void:
 	judgement_label.text = "MISS"
+	judgement_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.18))
 	cursor.visible = false
+	_fade_gauge_idle()
+
+
+func show_rejection() -> void:
+	judgement_label.text = "INVALID"
+	judgement_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.2))
+	var tween := create_tween()
+	tween.tween_interval(0.18)
+	tween.tween_property(judgement_label, "modulate:a", 0.0, 0.16)
+	tween.tween_callback(func():
+		judgement_label.text = ""
+		judgement_label.modulate.a = 1.0
+	)
 
 
 func update_combo(
@@ -178,17 +212,31 @@ func update_combo(
 	perfect_count: int,
 	max_combo: int
 ) -> void:
-	var slots: Array[String] = []
+	while combo_slots.get_child_count() < max_combo:
+		var panel := Panel.new()
+		panel.custom_minimum_size = Vector2(108, 40)
+		combo_slots.add_child(panel)
+
+	while combo_slots.get_child_count() > max_combo:
+		var extra := combo_slots.get_child(combo_slots.get_child_count() - 1)
+		combo_slots.remove_child(extra)
+		extra.queue_free()
 
 	for i in range(max_combo):
-		if i < combo.size():
-			slots.append(
-				"[ %s ]" % combo[i].display_name
-			)
-		else:
-			slots.append("[ empty ]")
+		var panel := combo_slots.get_child(i) as Panel
+		for child in panel.get_children():
+			panel.remove_child(child)
+			child.queue_free()
 
-	combo_label.text = "  ".join(slots)
+		var label := Label.new()
+		label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.text = combo[i].display_name if i < combo.size() else "○"
+		label.add_theme_font_size_override("font_size", 13)
+		if i < combo.size():
+			label.add_theme_color_override("font_color", combo[i].rune_color.lightened(0.25))
+		panel.add_child(label)
 
 	if perfect_count >= 2:
 		perfect_label.text = (
@@ -223,3 +271,15 @@ func show_parry(
 	parry_label.text = (
 		"ALGIZ : " + direction_name
 	)
+
+
+func _set_gauge_alpha(value: float) -> void:
+	for part in gauge_parts:
+		part.modulate.a = value
+
+
+func _fade_gauge_idle() -> void:
+	var tween := create_tween()
+
+	for part in gauge_parts:
+		tween.parallel().tween_property(part, "modulate:a", 0.18, 0.16)

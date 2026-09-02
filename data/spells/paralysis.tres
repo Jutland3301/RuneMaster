@@ -1,3 +1,14 @@
-[gd_resource type="TextMesh" format=3 uid="uid://dk78tiy7jpjal"]
-
+[gd_resource type="Resource" script_class="SpellData" load_steps=3 format=3 uid="uid://dk78tiy7jpjal"]
+[ext_resource type="Script" path="res://scripts/data/spell_data.gd" id="1_spell"]
+[ext_resource type="Script" path="res://scripts/effects/paralysis_effect.gd" id="2_effect"]
 [resource]
+script = ExtResource("1_spell")
+id = &"paralysis"
+display_name = "Paralysis"
+required_runes = Array[StringName]([&"lightning", &"grass"])
+base_damage = 70.0
+attribute_id = &"paralysis"
+activation_time = 0.3
+target_mode = 0
+effect_script = ExtResource("2_effect")
+effect_color = Color(0.58, 0.84, 0.26, 1)

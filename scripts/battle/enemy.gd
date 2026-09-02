@@ -47,6 +47,7 @@ var active_attack: EnemyAttackEvent = null
 var stun_remaining: float = 0.0
 var paralysis_remaining: float = 0.0
 var debug_ai_frozen: bool = false
+var status_controller: StatusEffectController
 # Snapshot modifier supplied when an attack is created.
 # Mist will later feed +0.3 here.
 var parry_window_bonus: float = 0.0
@@ -71,6 +72,10 @@ func setup(
 	active_attack = null
 	stun_remaining = 0.0
 	paralysis_remaining = 0.0
+
+	status_controller = StatusEffectController.new()
+	status_controller.name = "StatusEffects"
+	add_child(status_controller)
 
 	roll_next_attack()
 
@@ -126,7 +131,8 @@ func try_start_attack() -> void:
 
 	if not scheduler.can_start_attack(
 		attack,
-		battle_manager.battle_time
+		battle_manager.battle_time,
+		data
 	):
 		# Preserve attack readiness instead of rerolling.
 		next_attack_remaining = 0.05
@@ -279,6 +285,11 @@ func apply_paralysis(duration: float) -> bool:
 		return false
 
 	paralysis_remaining = duration
+	status_controller.add_effect(
+		&"paralysis",
+		duration,
+		StatusEffectController.StackRule.IGNORE
+	)
 	return true
 
 
@@ -310,6 +321,7 @@ func die() -> void:
 		return
 
 	alive = false
+	status_controller.clear_all()
 
 	cancel_active_attack()
 

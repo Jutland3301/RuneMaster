@@ -4,6 +4,7 @@ extends Node
 signal activation_started(event: PlayerAttackEvent)
 signal enemy_effect_started(event: PlayerAttackEvent)
 signal spell_finished(event: PlayerAttackEvent)
+signal activation_lock_changed(locked: bool)
 
 signal damage_applied(
 	target,
@@ -22,6 +23,7 @@ signal immune(
 	target,
 	attribute_id: StringName
 )
+signal impact_pulse(target, color: Color, intensity: float, spell_id: StringName)
 
 var player: PlayerCombat
 
@@ -39,6 +41,7 @@ var effect_handlers: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 
 var active_burns: Dictionary = {}
+var damage_sequences: Array[Dictionary] = []
 
 
 func setup(
@@ -56,8 +59,6 @@ func setup(
 		player_status.effect_removed.connect(
 			_on_player_effect_removed
 		)
-
-	rng.randomize()
 
 	add_to_group("spell_executor")
 
@@ -127,6 +128,7 @@ func activate(event: PlayerAttackEvent) -> bool:
 		return false
 
 	activation_locked = true
+	activation_lock_changed.emit(true)
 	active_event = event
 
 	activation_remaining = maxf(
@@ -144,6 +146,7 @@ func activate(event: PlayerAttackEvent) -> bool:
 
 func _process(delta: float) -> void:
 	_update_burns(delta)
+	_update_damage_sequences(delta)
 
 	if not activation_locked:
 		return
@@ -178,6 +181,7 @@ func _begin_enemy_effect() -> void:
 	# Hand-side activation ends here.
 	# The next completed spell may now be fired.
 	activation_locked = false
+	activation_lock_changed.emit(false)
 	active_event = null
 	activation_remaining = 0.0
 
@@ -193,6 +197,13 @@ func _execute_effect(event: PlayerAttackEvent) -> void:
 
 	if spell == null:
 		return
+
+	if spell.effect_script != null:
+		var scripted_handler = spell.effect_script.new()
+
+		if scripted_handler is SpellEffect:
+			(scripted_handler as SpellEffect).execute(event, self)
+			return
 
 	var effect_id := spell.id
 
@@ -217,7 +228,8 @@ func _execute_effect(event: PlayerAttackEvent) -> void:
 func apply_direct_spell_damage(
 	event: PlayerAttackEvent,
 	target,
-	base_damage: float
+	base_damage: float,
+	impact_intensity: float = 1.0
 ) -> int:
 	if event == null or event.spell == null:
 		return 0
@@ -233,6 +245,12 @@ func apply_direct_spell_damage(
 	)
 
 	if resistance <= 0.0:
+		impact_pulse.emit(
+			target,
+			event.spell.effect_color,
+			1.0,
+			event.spell.id
+		)
 		immune.emit(
 			target,
 			event.attribute_id
@@ -246,6 +264,12 @@ func apply_direct_spell_damage(
 	)
 
 	target.apply_damage(amount)
+	impact_pulse.emit(
+		target,
+		event.spell.effect_color,
+		impact_intensity + float(event.perfect_count) * 0.18,
+		event.spell.id
+	)
 
 	damage_applied.emit(
 		target,
@@ -286,6 +310,14 @@ func start_burn(
 	)
 
 	active_burns[key] = burn
+
+	if target is BattleEnemy:
+		var enemy := target as BattleEnemy
+		enemy.status_controller.add_effect(
+			&"burn",
+			float(ticks) * interval,
+			StatusEffectController.StackRule.IGNORE
+		)
 
 	return true
 
@@ -359,12 +391,73 @@ func _apply_burn_tick(
 		burn.target,
 		amount
 	)
+	impact_pulse.emit(
+		burn.target,
+		Color(0.9, 0.34, 0.1),
+		0.55,
+		&"burn"
+	)
+
+
+func queue_damage_sequence(
+	event: PlayerAttackEvent,
+	target,
+	base_damages: Array[float],
+	delays: Array[float]
+) -> void:
+	for i in range(base_damages.size()):
+		damage_sequences.append({
+			"event": event,
+			"target": target,
+			"base_damage": base_damages[i],
+			"remaining": delays[i] if i < delays.size() else 0.0,
+			"intensity": 0.75 + float(i) * 0.35
+		})
+
+
+func _update_damage_sequences(delta: float) -> void:
+	for i in range(damage_sequences.size() - 1, -1, -1):
+		var entry: Dictionary = damage_sequences[i]
+		entry["remaining"] = float(entry["remaining"]) - delta
+
+		if float(entry["remaining"]) > 0.0:
+			continue
+
+		var event := entry["event"] as PlayerAttackEvent
+		var target = entry["target"]
+
+		if is_instance_valid(target) and target.is_alive():
+			apply_direct_spell_damage(
+				event,
+				target,
+				float(entry["base_damage"]),
+				float(entry["intensity"])
+			)
+
+		damage_sequences.remove_at(i)
 
 
 func cancel_activation() -> void:
+	var was_locked := activation_locked
 	activation_locked = false
 	active_event = null
 	activation_remaining = 0.0
+
+	if was_locked:
+		activation_lock_changed.emit(false)
+
+
+func clear_runtime_effects() -> void:
+	cancel_activation()
+	active_burns.clear()
+	damage_sequences.clear()
+
+	if player != null:
+		player.guard_damage_multiplier = 1.0
+
+
+func set_rng_seed(seed_value: int) -> void:
+	rng.seed = seed_value
 
 
 func _on_player_effect_removed(

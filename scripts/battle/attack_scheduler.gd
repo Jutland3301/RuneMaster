@@ -6,11 +6,13 @@ var last_attack_start_time: float = -9999.0
 var category_last_start: Dictionary = {}
 
 var default_minimum_spacing: float = 0.35
+var category_minimum_spacing: Dictionary = {&"normal": 0.35}
 
 
 func can_start_attack(
 	attack: AttackData,
-	current_battle_time: float
+	current_battle_time: float,
+	enemy_data: EnemyData = null
 ) -> bool:
 	if attack == null:
 		return false
@@ -22,6 +24,13 @@ func can_start_attack(
 		default_minimum_spacing,
 		attack.minimum_spacing
 	)
+	required_spacing = maxf(
+		required_spacing,
+		float(category_minimum_spacing.get(attack.spacing_category, 0.0))
+	)
+
+	if enemy_data != null:
+		required_spacing = maxf(required_spacing, enemy_data.minimum_attack_spacing)
 
 	if current_battle_time - last_attack_start_time < required_spacing:
 		return false

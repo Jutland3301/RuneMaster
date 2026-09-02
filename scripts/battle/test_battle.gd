@@ -1,6 +1,9 @@
 class_name TestBattle
 extends Node
 
+static var queued_rng_seed: int = 0
+static var has_queued_rng_seed: bool = false
+
 var battle_manager: BattleManager
 var scheduler: AttackScheduler
 var player: PlayerCombat
@@ -30,6 +33,8 @@ var keybind_manager: KeybindManager
 var loadout_ui: LoadoutKeybindUI
 var debug_overlay: DebugOverlay
 var battle_result: BattleResult
+var battle_setup: BattleSetup
+var battle_audio: BattleAudio
 
 var total_perfects: int = 0
 var parry_count: int = 0
@@ -39,8 +44,17 @@ var spell_use_counts: Dictionary = {}
 var defeated_enemy_ids: Array[StringName] = []
 
 func _ready() -> void:
+	if has_queued_rng_seed:
+		rng_seed = queued_rng_seed
+
 	battle_result = BattleResult.new()
+	battle_setup = BattleSetup.consume_queued()
+
+	if battle_setup == null:
+		battle_setup = _create_default_test_setup()
+
 	persistent_data = SaveSystem.load_player()
+	persistent_data.validate_loadout()
 
 	resistance_knowledge = ResistanceKnowledge.new()
 	resistance_knowledge.setup(
@@ -68,17 +82,18 @@ func _ready() -> void:
 	print("Enemies: ", enemies.size())
 	print("Selected target: ", _target_name())
 	print("Seed: ", rng_seed)
-	print("")
-	print("Rune keys:")
-	print("Q = Algiz")
-	print("A = Fire")
-	print("S = Water")
-	print("D = Lightning")
-	print("F = Grass")
-	print("Enter = Judge / Fire")
-	print("X = Cancel")
-	print("Arrow keys = Target / Parry direction")
+	print("Enter = Judge / Fire; X = Cancel; arrows = Target / Parry")
+	print("Tab = Loadout / Keybinds; F3 = Debug")
 	print("===================================")
+
+
+func set_debug_seed(value: int) -> void:
+	rng_seed = value
+	queued_rng_seed = value
+	has_queued_rng_seed = true
+	rng.seed = value
+	rune_caster.rng.seed = value
+	spell_executor.set_rng_seed(value + 7301)
 
 
 func _create_runtime_nodes() -> void:
@@ -114,6 +129,11 @@ func _create_runtime_nodes() -> void:
 	player_status.name = "PlayerStatus"
 	add_child(player_status)
 
+	battle_audio = BattleAudio.new()
+	battle_audio.name = "BattleAudio"
+	add_child(battle_audio)
+	battle_audio.setup(battle_setup.bgm)
+
 	battle_manager.register_player(player)
 
 	player.reset_for_battle(
@@ -144,229 +164,60 @@ func _create_spell_database() -> void:
 		battle_status,
 		player_status
 	)
+	spell_executor.set_rng_seed(rng_seed + 7301)
 
 
 func _create_runes() -> void:
-	var pattern := CastingPattern.new()
+	var files := DirAccess.get_files_at("res://data/runes")
+	files.sort()
 
-	pattern.id = &"pattern_1"
-	pattern.total_duration = 2.0
-	pattern.miss_edge = 0.20
-	pattern.perfect_start = 0.47
-	pattern.perfect_end = 0.53
-	pattern.round_trips = 2
+	for file_name in files:
+		if not file_name.ends_with(".tres"):
+			continue
 
-	runes[&"algiz"] = _make_rune(
-		&"algiz",
-		"Algiz",
-		false,
-		null
-	)
+		var resource := load("res://data/runes".path_join(file_name))
 
-	runes[&"fire"] = _make_rune(
-		&"fire",
-		"Kenaz / Fire",
-		true,
-		pattern
-	)
+		if resource is RuneData:
+			var rune := resource as RuneData
+			runes[rune.id] = rune
 
-	runes[&"water"] = _make_rune(
-		&"water",
-		"Laguz / Water",
-		true,
-		pattern
-	)
+	for i in range(mini(8, persistent_data.loadout.size())):
+		var rune_id := persistent_data.loadout[i]
 
-	runes[&"lightning"] = _make_rune(
-		&"lightning",
-		"Hagalaz / Lightning",
-		true,
-		pattern
-	)
+		if rune_id == &"" or not persistent_data.owned_runes.has(rune_id):
+			continue
 
-	runes[&"grass"] = _make_rune(
-		&"grass",
-		"Ingwaz / Grass",
-		true,
-		pattern
-	)
+		if not runes.has(rune_id):
+			push_warning("Loadout rune resource missing: %s" % rune_id)
+			continue
 
-	player_input.register_rune_action(
-		&"rune_slot_1",
-		runes[&"algiz"]
-	)
-
-	player_input.register_rune_action(
-		&"rune_slot_2",
-		runes[&"fire"]
-	)
-
-	player_input.register_rune_action(
-		&"rune_slot_3",
-		runes[&"water"]
-	)
-
-	player_input.register_rune_action(
-		&"rune_slot_4",
-		runes[&"lightning"]
-	)
-
-	player_input.register_rune_action(
-		&"rune_slot_5",
-		runes[&"grass"]
-	)
-
-
-func _make_rune(
-	id: StringName,
-	display_name: String,
-	is_element: bool,
-	pattern: CastingPattern
-) -> RuneData:
-	var rune := RuneData.new()
-
-	rune.id = id
-	rune.display_name = display_name
-	rune.is_element = is_element
-	rune.casting_pattern = pattern
-
-	return rune
+		player_input.register_rune_action(
+			KeybindManager.SLOT_ACTIONS[i],
+			runes[rune_id]
+		)
 
 
 func _create_test_enemies() -> void:
-	var enemy_a := _make_enemy_data(
-		&"test_a",
-		"Test Enemy A",
-		1000,
-		{
-			&"fire": 1.5,
-			&"water": 0.5
-		}
-	)
-
-	var enemy_b := _make_enemy_data(
-		&"test_b",
-		"Test Enemy B",
-		1200,
-		{
-			&"lightning": 1.5,
-			&"grass": 0.5
-		}
-	)
-
-	var enemy_c := _make_enemy_data(
-		&"test_c",
-		"Test Enemy C",
-		1500,
-		{
-			&"plasma": 0.0
-		}
-	)
-
-	enemy_a.attacks = [
-		_make_fixed_attack(
-			&"a_front",
-			12,
-			EnemyAttackEvent.ParryDirection.FRONT
-		),
-		_make_fixed_attack(
-			&"a_left",
-			10,
-			EnemyAttackEvent.ParryDirection.LEFT
-		)
-	]
-
-	enemy_b.attacks = [
-		_make_fixed_attack(
-			&"b_up",
-			12,
-			EnemyAttackEvent.ParryDirection.UP
-		),
-		_make_fixed_attack(
-			&"b_down",
-			12,
-			EnemyAttackEvent.ParryDirection.DOWN
-		)
-	]
-
-	var random_attack := AttackData.new()
-	random_attack.id = &"c_random"
-	random_attack.display_name = "Chaos Strike"
-	random_attack.damage = 14
-	random_attack.direction_mode = (
-		AttackData.DirectionMode.WEIGHTED_RANDOM
-	)
-	random_attack.direction_weights = [
-		0.2,
-		0.2,
-		0.2,
-		0.2,
-		0.2
-	]
-	random_attack.telegraph_duration = 1.2
-	random_attack.parry_window_start = 0.7
-	random_attack.parry_window_end = 1.0
-
-	enemy_c.attacks = [
-		_make_fixed_attack(
-			&"c_right",
-			14,
-			EnemyAttackEvent.ParryDirection.RIGHT
-		),
-		random_attack
-	]
-
-	_spawn_enemy(enemy_a)
-	_spawn_enemy(enemy_b)
-	_spawn_enemy(enemy_c)
+	for enemy_data in battle_setup.enemies:
+		_spawn_enemy(enemy_data)
 
 
-func _make_enemy_data(
-	id: StringName,
-	display_name: String,
-	max_hp: int,
-	resistances: Dictionary
-) -> EnemyData:
-	var data := EnemyData.new()
+func _create_default_test_setup() -> BattleSetup:
+	var enemy_list: Array[EnemyData] = []
 
-	data.id = id
-	data.display_name = display_name
-	data.max_hp = max_hp
+	for path in [
+		"res://data/enemies/test_enemy_a.tres",
+		"res://data/enemies/test_enemy_b.tres",
+		"res://data/enemies/test_enemy_c.tres"
+	]:
+		var resource := load(path)
 
-	data.attack_interval_min = 2.0
-	data.attack_interval_max = 3.5
+		if resource is EnemyData:
+			enemy_list.append(resource as EnemyData)
+		else:
+			push_error("Invalid EnemyData resource: %s" % path)
 
-	data.parry_stun_duration = 1.0
-	data.resistances = resistances
-
-	return data
-
-
-func _make_fixed_attack(
-	id: StringName,
-	damage: int,
-	direction: EnemyAttackEvent.ParryDirection
-) -> AttackData:
-	var attack := AttackData.new()
-
-	attack.id = id
-	attack.display_name = String(id)
-
-	attack.damage = damage
-
-	attack.direction_mode = (
-		AttackData.DirectionMode.FIXED
-	)
-
-	attack.fixed_direction = direction
-
-	attack.telegraph_duration = 1.2
-	attack.parry_window_start = 0.7
-	attack.parry_window_end = 1.0
-
-	attack.minimum_spacing = 0.35
-
-	return attack
+	return BattleSetup.new(enemy_list)
 
 
 func _spawn_enemy(data: EnemyData) -> void:
@@ -417,6 +268,9 @@ func _connect_runtime() -> void:
 	rune_caster.cast_missed.connect(
 		_on_cast_missed
 	)
+	rune_caster.input_rejected.connect(
+		func(_reason: StringName): battle_audio.play_sfx(&"miss")
+	)
 
 	rune_caster.combo_changed.connect(
 		_on_combo_changed
@@ -432,6 +286,13 @@ func _connect_runtime() -> void:
 
 	player_input.target_next_requested.connect(
 		_on_target_next
+	)
+	player_input.cancel_requested.connect(
+		func(): battle_audio.play_sfx(&"cancel")
+	)
+
+	spell_executor.activation_started.connect(
+		func(_event: PlayerAttackEvent): battle_audio.play_sfx(&"spell_cast")
 	)
 
 	player_input.parry_entered.connect(
@@ -580,7 +441,7 @@ func _on_target_next() -> void:
 
 
 func _cycle_target(direction: int) -> void:
-	if not rune_caster.has_combo():
+	if not _current_spell_uses_selected_enemy():
 		return
 
 	if enemies.is_empty():
@@ -603,6 +464,7 @@ func _cycle_target(direction: int) -> void:
 				"TARGET -> ",
 				_target_name()
 			)
+			battle_audio.play_sfx(&"target_change")
 
 			return
 
@@ -614,6 +476,18 @@ func _target_name() -> String:
 		return "NONE"
 
 	return target.data.display_name
+
+
+func _current_spell_uses_selected_enemy() -> bool:
+	var spell := rune_caster.get_current_spell()
+
+	if spell == null:
+		return false
+
+	return spell.target_mode in [
+		SpellData.TargetMode.SINGLE_ENEMY,
+		SpellData.TargetMode.RANDOM_MULTI
+	]
 
 
 func _on_player_died() -> void:
@@ -628,6 +502,7 @@ func _on_player_damaged(
 	rune_caster.clear_combo()
 
 	print("PLAYER HIT: ", amount)
+	battle_audio.play_sfx(&"player_hit")
 
 func _on_player_hp_changed(
 	current: int,
@@ -642,6 +517,7 @@ func _on_player_hp_changed(
 
 
 func _on_casting_started(rune: RuneData) -> void:
+	battle_audio.play_sfx(&"rune_input")
 	print(
 		"CAST START: ",
 		rune.display_name
@@ -662,6 +538,9 @@ func _on_rune_success(
 ) -> void:
 	if judgement == &"perfect":
 		total_perfects += 1
+		battle_audio.play_sfx(&"perfect", 1.0 + float(rune_caster.perfect_count) * 0.05)
+	else:
+		battle_audio.play_sfx(&"normal")
 
 	print(
 		"RUNE ",
@@ -673,6 +552,7 @@ func _on_rune_success(
 
 func _on_cast_missed() -> void:
 	print("MISS - COMBO CLEARED")
+	battle_audio.play_sfx(&"miss")
 
 
 func _on_combo_changed(
@@ -705,6 +585,7 @@ func _on_enemy_attack_started(
 	enemy: BattleEnemy,
 	event: EnemyAttackEvent
 ) -> void:
+	battle_audio.play_sfx(&"telegraph")
 	print(
 		enemy.data.display_name,
 		" ATTACK -> ",
@@ -719,6 +600,7 @@ func _on_enemy_parried(
 	event: EnemyAttackEvent
 ) -> void:
 	parry_count += 1
+	battle_audio.play_sfx(&"parry")
 	print(
 		"PARRY SUCCESS: ",
 		enemy.data.display_name,
@@ -748,6 +630,7 @@ func _on_spell_damage(
 	perfect_count: int,
 	attribute_id: StringName
 ) -> void:
+	battle_audio.play_sfx(&"spell_hit")
 	resistance_knowledge.discover(
 		target.data.id,
 		attribute_id,
@@ -832,6 +715,8 @@ func _select_next_after_death() -> void:
 	for i in range(enemies.size()):
 		if enemies[i].is_alive():
 			selected_target_index = i
+			if battle_ui != null:
+				battle_ui.refresh_targets(self)
 			return
 
 
@@ -844,11 +729,13 @@ func _on_battle_state_changed(
 	)
 
 	if state == BattleManager.BattleState.VICTORY:
+		battle_audio.stop_bgm()
+		battle_audio.play_sfx(&"victory")
 		player_input.input_enabled = false
 		battle_status.set_battle_running(false)
 		player_status.set_battle_running(false)
 
-		spell_executor.cancel_activation()
+		_clear_runtime_statuses()
 
 		_build_battle_result(true)
 
@@ -858,11 +745,13 @@ func _on_battle_state_changed(
 			)
 
 	elif state == BattleManager.BattleState.DEFEAT:
+		battle_audio.stop_bgm()
+		battle_audio.play_sfx(&"defeat")
 		player_input.input_enabled = false
 		battle_status.set_battle_running(false)
 		player_status.set_battle_running(false)
 
-		spell_executor.cancel_activation()
+		_clear_runtime_statuses()
 
 		_build_battle_result(false)
 
@@ -870,6 +759,16 @@ func _on_battle_state_changed(
 			battle_ui.show_result(
 				false
 			)
+
+
+func _clear_runtime_statuses() -> void:
+	spell_executor.clear_runtime_effects()
+	battle_status.clear_all()
+	player_status.clear_all()
+
+	for enemy in enemies:
+		if is_instance_valid(enemy) and enemy.status_controller != null:
+			enemy.status_controller.clear_all()
 
 func _direction_name(
 	direction: EnemyAttackEvent.ParryDirection
@@ -960,6 +859,9 @@ func _build_battle_result(
 	battle_result.spell_use_counts = (
 		spell_use_counts.duplicate(true)
 	)
+
+	persistent_data.current_hp = player.hp
+	SaveSystem.save_player(persistent_data)
 
 	print("----- BATTLE RESULT -----")
 	print("Victory: ", battle_result.victory)

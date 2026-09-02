@@ -1,3 +1,14 @@
-[gd_resource type="TextMesh" format=3 uid="uid://bn1ijhvmvuhjf"]
-
+[gd_resource type="Resource" script_class="SpellData" load_steps=3 format=3 uid="uid://bn1ijhvmvuhjf"]
+[ext_resource type="Script" path="res://scripts/data/spell_data.gd" id="1_spell"]
+[ext_resource type="Script" path="res://scripts/effects/electric_whip_effect.gd" id="2_effect"]
 [resource]
+script = ExtResource("1_spell")
+id = &"electric_whip"
+display_name = "Electric Whip"
+required_runes = Array[StringName]([&"water", &"lightning"])
+base_damage = 100.0
+attribute_id = &"electric_whip"
+activation_time = 0.08
+target_mode = 2
+effect_script = ExtResource("2_effect")
+effect_color = Color(0.34, 0.82, 1, 1)

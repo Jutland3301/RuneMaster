@@ -1,3 +1,39 @@
-[gd_resource type="TextMesh" format=3 uid="uid://c6h7704x03c46"]
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://c6h7704x03c46"]
+
+[ext_resource type="Script" uid="uid://c3wxua420qv55" path="res://scripts/data/enemy_data.gd" id="1_enemy"]
+[ext_resource type="Script" uid="uid://c66f1swmolkmf" path="res://scripts/data/attack_data.gd" id="2_attack"]
+[ext_resource type="Texture2D" uid="uid://cvkwgdn7r2qm" path="res://assets/enemies/Enemy1.png" id="3_rwumo"]
+
+[sub_resource type="Resource" id="AttackData_right"]
+script = ExtResource("2_attack")
+id = &"c_right"
+display_name = "Right Breaker"
+damage = 14
+fixed_direction = 4
+telegraph_duration = 1.2
+parry_window_start = 0.7
+parry_window_end = 1.0
+
+[sub_resource type="Resource" id="AttackData_random"]
+script = ExtResource("2_attack")
+id = &"c_random"
+display_name = "Chaos Strike"
+damage = 14
+direction_mode = 1
+telegraph_duration = 1.2
+parry_window_start = 0.7
+parry_window_end = 1.0
 
 [resource]
+script = ExtResource("1_enemy")
+id = &"test_c"
+display_name = "Test Enemy C"
+sprite = ExtResource("3_rwumo")
+presentation_color = Color(0.46, 0.22, 0.62, 1)
+max_hp = 1500
+attack_interval_min = 2.0
+attack_interval_max = 3.5
+attacks = Array[ExtResource("2_attack")]([SubResource("AttackData_right"), SubResource("AttackData_random")])
+resistances = {
+&"plasma": 0.0
+}

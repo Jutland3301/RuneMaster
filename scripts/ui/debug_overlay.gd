@@ -27,6 +27,8 @@ var burn_button: Button
 var damage_button: Button
 var ai_frozen: bool = false
 var freeze_ai_button: Button
+var mp_spin: SpinBox
+var seed_edit: LineEdit
 
 
 func setup(p_battle) -> void:
@@ -56,12 +58,12 @@ func toggle() -> void:
 func _build() -> void:
 	panel = Panel.new()
 	panel.position = Vector2(15, 15)
-	panel.size = Vector2(600, 730)
+	panel.size = Vector2(720, 800)
 	add_child(panel)
 
 	info = Label.new()
 	info.position = Vector2(15, 15)
-	info.size = Vector2(570, 480)
+	info.size = Vector2(690, 480)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(info)
 
@@ -192,6 +194,33 @@ func _build() -> void:
 	_toggle_ai_freeze
 	)
 
+	var mp_label := Label.new()
+	mp_label.position = Vector2(150, 681)
+	mp_label.text = "MP"
+	panel.add_child(mp_label)
+
+	mp_spin = SpinBox.new()
+	mp_spin.position = Vector2(185, 675)
+	mp_spin.size = Vector2(100, 36)
+	mp_spin.min_value = 0.0
+	mp_spin.max_value = 999.0
+	mp_spin.step = 1.0
+	mp_spin.value_changed.connect(_set_magic_power)
+	panel.add_child(mp_spin)
+
+	var seed_label := Label.new()
+	seed_label.position = Vector2(300, 681)
+	seed_label.text = "Seed"
+	panel.add_child(seed_label)
+
+	seed_edit = LineEdit.new()
+	seed_edit.position = Vector2(345, 675)
+	seed_edit.size = Vector2(145, 36)
+	seed_edit.placeholder_text = "RNG seed"
+	panel.add_child(seed_edit)
+
+	_make_debug_button("Apply Seed", Vector2(500, 675), Vector2(120, 36), _apply_seed)
+
 func _refresh() -> void:
 	var player: PlayerCombat = battle.player
 	var caster: RuneCaster = battle.rune_caster
@@ -293,6 +322,8 @@ func _refresh() -> void:
 			battle.player_status.get_remaining(&"algae_guard")
 		]
 	)
+	lines.append("Player effects: %s" % _effect_text(battle.player_status))
+	lines.append("Battle effects: %s" % _effect_text(battle.battle_status))
 
 	lines.append("")
 	lines.append("ENEMIES")
@@ -318,7 +349,7 @@ func _refresh() -> void:
 			parry_window = enemy.active_attack.parry_window_active
 
 		lines.append(
-			"%s HP=%d timer=%.2f atk=%s dir=%s prog=%.2f P=%s stun=%.2f para=%.2f" % [
+			"%s HP=%d timer=%.2f atk=%s dir=%s prog=%.2f P=%s stun=%.2f para=%.2f fx=%s" % [
 				enemy.data.display_name,
 				enemy.hp,
 				enemy.next_attack_remaining,
@@ -327,7 +358,8 @@ func _refresh() -> void:
 				progress,
 				str(parry_window),
 				enemy.stun_remaining,
-				enemy.paralysis_remaining
+				enemy.paralysis_remaining,
+				_effect_text(enemy.status_controller)
 			]
 		)
 
@@ -336,6 +368,7 @@ func _refresh() -> void:
 		"Scheduler last attack: %.2f" %
 		battle.scheduler.last_attack_start_time
 	)
+	lines.append("Scheduler categories: %s" % str(battle.scheduler.category_last_start))
 
 	lines.append(
 		"Reveal all: %s  God: %s" % [
@@ -345,6 +378,12 @@ func _refresh() -> void:
 	)
 
 	info.text = "\n".join(lines)
+
+	if not mp_spin.has_focus():
+		mp_spin.value = player.magic_power
+
+	if not seed_edit.has_focus():
+		seed_edit.text = str(battle.rng_seed)
 
 
 func _toggle_god() -> void:
@@ -485,3 +524,26 @@ func _toggle_ai_freeze() -> void:
 		if ai_frozen
 		else "Freeze AI"
 	)
+
+
+func _set_magic_power(value: float) -> void:
+	if battle != null:
+		battle.player.magic_power = value
+		battle.persistent_data.magic_power = value
+
+
+func _apply_seed() -> void:
+	if not seed_edit.text.is_valid_int():
+		return
+
+	var new_seed := seed_edit.text.to_int()
+	battle.set_debug_seed(new_seed)
+
+
+func _effect_text(controller: StatusEffectController) -> String:
+	var parts: Array[String] = []
+
+	for entry in controller.get_debug_entries():
+		parts.append("%s %.1f" % [entry["id"], entry["remaining"]])
+
+	return "-" if parts.is_empty() else ", ".join(parts)

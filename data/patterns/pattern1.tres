@@ -1,3 +1,12 @@
-[gd_resource type="TextMesh" format=3 uid="uid://dr048g5ynnvrq"]
+[gd_resource type="Resource" script_class="CastingPattern" load_steps=2 format=3 uid="uid://dr048g5ynnvrq"]
+
+[ext_resource type="Script" path="res://scripts/data/casting_pattern.gd" id="1_pattern"]
 
 [resource]
+script = ExtResource("1_pattern")
+id = &"pattern_1"
+total_duration = 2.0
+miss_edge = 0.2
+perfect_start = 0.47
+perfect_end = 0.53
+round_trips = 2

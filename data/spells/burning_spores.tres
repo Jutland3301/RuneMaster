@@ -1,3 +1,14 @@
-[gd_resource type="TextMesh" format=3 uid="uid://bpe75c0o3stt1"]
-
+[gd_resource type="Resource" script_class="SpellData" load_steps=3 format=3 uid="uid://bpe75c0o3stt1"]
+[ext_resource type="Script" path="res://scripts/data/spell_data.gd" id="1_spell"]
+[ext_resource type="Script" path="res://scripts/effects/burning_sprores_effect.gd" id="2_effect"]
 [resource]
+script = ExtResource("1_spell")
+id = &"burning_spores"
+display_name = "Burning Spores"
+required_runes = Array[StringName]([&"fire", &"grass"])
+base_damage = 130.0
+attribute_id = &"burning_spores"
+activation_time = 0.35
+target_mode = 0
+effect_script = ExtResource("2_effect")
+effect_color = Color(0.92, 0.42, 0.12, 1)

@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="FusionUIStyle" format=3 uid="uid://d0i712qaqh8r0"]
+
+[ext_resource type="Texture2D" uid="uid://b7i6thqqcriev" path="res://assets/runes/土台.png" id="1_fjjls"]
+[ext_resource type="Script" uid="uid://djnghpi57kdgd" path="res://scripts/ui/fusion_ui_style.gd" id="1_ft1xd"]
+
+[resource]
+script = ExtResource("1_ft1xd")
+base_texture = ExtResource("1_fjjls")

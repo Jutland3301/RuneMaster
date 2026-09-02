@@ -1,3 +1,14 @@
-[gd_resource type="TextMesh" format=3 uid="uid://oe31bb4d0opq"]
-
+[gd_resource type="Resource" script_class="SpellData" load_steps=3 format=3 uid="uid://oe31bb4d0opq"]
+[ext_resource type="Script" path="res://scripts/data/spell_data.gd" id="1_spell"]
+[ext_resource type="Script" path="res://scripts/effects/plasma_effect.gd" id="2_effect"]
 [resource]
+script = ExtResource("1_spell")
+id = &"plasma"
+display_name = "Plasma"
+required_runes = Array[StringName]([&"fire", &"lightning"])
+base_damage = 200.0
+attribute_id = &"plasma"
+activation_time = 0.35
+target_mode = 0
+effect_script = ExtResource("2_effect")
+effect_color = Color(0.76, 0.22, 1, 1)

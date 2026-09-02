@@ -16,6 +16,7 @@ var close_button: Button
 
 var waiting_action: StringName = &""
 var buttons: Dictionary = {}
+var rune_selectors: Dictionary = {}
 
 
 func setup(
@@ -142,22 +143,26 @@ func _create_slot_row(
 
 	row.add_child(slot_label)
 
-	var rune_label := Label.new()
-	rune_label.custom_minimum_size.x = 220
+	var selector := OptionButton.new()
+	selector.custom_minimum_size.x = 220
 
-	var rune_id: StringName = &""
-
-	if index < persistent_data.loadout.size():
-		rune_id = (
-			persistent_data.loadout[index]
-		)
-
-	if rune_id == &"":
-		rune_label.text = "Empty"
+	if index == 0:
+		selector.add_item("Algiz")
+		selector.set_item_metadata(0, &"algiz")
+		selector.disabled = true
 	else:
-		rune_label.text = String(rune_id)
+		selector.add_item("Empty")
+		selector.set_item_metadata(0, &"")
 
-	row.add_child(rune_label)
+		for owned_id in persistent_data.owned_runes:
+			if owned_id == &"algiz":
+				continue
+			selector.add_item(String(owned_id).capitalize())
+			selector.set_item_metadata(selector.item_count - 1, owned_id)
+
+	selector.item_selected.connect(_on_rune_selected.bind(index))
+	row.add_child(selector)
+	rune_selectors[index] = selector
 
 	var action := KeybindManager.SLOT_ACTIONS[
 		index
@@ -179,6 +184,15 @@ func _create_slot_row(
 
 
 func _refresh() -> void:
+	for index in rune_selectors:
+		var selector: OptionButton = rune_selectors[index]
+		var current_id: StringName = persistent_data.loadout[index]
+
+		for item_index in range(selector.item_count):
+			if selector.get_item_metadata(item_index) == current_id:
+				selector.select(item_index)
+				break
+
 	for action in buttons:
 		var button: Button = buttons[action]
 
@@ -207,7 +221,7 @@ func _on_bind_pressed(
 	)
 
 
-func _unhandled_key_input(
+func _input(
 	event: InputEvent
 ) -> void:
 	if waiting_action == &"":
@@ -249,6 +263,28 @@ func _unhandled_key_input(
 		SaveSystem.save_player(
 			persistent_data
 		)
+
+	get_viewport().set_input_as_handled()
+
+
+func _on_rune_selected(item_index: int, slot_index: int) -> void:
+	if slot_index == 0:
+		return
+
+	var selector: OptionButton = rune_selectors[slot_index]
+	var rune_id: StringName = selector.get_item_metadata(item_index)
+
+	if rune_id != &"":
+		for i in range(1, persistent_data.loadout.size()):
+			if i != slot_index and persistent_data.loadout[i] == rune_id:
+				message_label.text = "That rune is already equipped."
+				_refresh()
+				return
+
+	persistent_data.loadout[slot_index] = rune_id
+	persistent_data.validate_loadout()
+	SaveSystem.save_player(persistent_data)
+	message_label.text = "Loadout saved. Changes apply next battle."
 
 
 func _on_binding_changed(

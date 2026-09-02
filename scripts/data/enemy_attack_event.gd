@@ -12,6 +12,9 @@ enum ParryDirection {
 var source_enemy
 var attack_data
 var resolved_direction: ParryDirection = ParryDirection.FRONT
+# Dormant extension point for future multi-parry events. Normal attacks use
+# exactly one entry and no current system consumes this as a gimmick.
+var resolved_directions: Array[ParryDirection] = []
 var damage: int = 0
 
 var elapsed: float = 0.0
@@ -28,4 +31,6 @@ func _init(
 	source_enemy = p_source_enemy
 	attack_data = p_attack_data
 	resolved_direction = p_direction
+	resolved_directions.clear()
+	resolved_directions.append(p_direction)
 	damage = p_damage

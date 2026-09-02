@@ -13,10 +13,7 @@ var player_hp_label: Label
 
 var casting_ui: CastingUI
 
-var fusion_panel: Panel
-var fusion_title: Label
-var fusion_spell: Label
-var fusion_components: Label
+var fusion_ui: FusionUI
 
 var telegraph_layer: Control
 
@@ -25,14 +22,33 @@ var telegraphs: Dictionary = {}
 var result_overlay: ColorRect
 var result_label: Label
 var retry_button: Button
+var low_hp_vignette: ColorRect
+var player_status_grid: GridContainer
+var hand_effect: ColorRect
+var mist_overlay: ColorRect
+var guard_effect: Panel
+var battle_ref
+var low_hp_active: bool = false
+var low_hp_time: float = 0.0
 
 
 func setup(test_battle) -> void:
+	battle_ref = test_battle
 	_build()
+
+	if test_battle.battle_setup.background != null:
+		var background := TextureRect.new()
+		background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		background.texture = test_battle.battle_setup.background
+		background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		world_panel.add_child(background)
 
 	test_battle.player.hp_changed.connect(
 		_on_player_hp_changed
 	)
+	test_battle.player.damaged.connect(_on_player_damaged)
 
 	test_battle.rune_caster.casting_started.connect(
 		_on_casting_started
@@ -73,9 +89,35 @@ func setup(test_battle) -> void:
 	test_battle.spell_executor.immune.connect(
 		_on_immune
 	)
+	test_battle.spell_executor.enemy_effect_started.connect(
+		_on_enemy_effect_started
+	)
+	test_battle.spell_executor.impact_pulse.connect(
+		_on_impact_pulse
+	)
+	test_battle.battle_status.effects_changed.connect(
+		_refresh_status_presentation.bind(test_battle)
+	)
+	test_battle.player_status.effects_changed.connect(
+		_refresh_status_presentation.bind(test_battle)
+	)
+	test_battle.spell_executor.activation_started.connect(
+		_on_spell_activation_started
+	)
+	test_battle.spell_executor.activation_lock_changed.connect(
+		_on_activation_lock_changed.bind(test_battle)
+	)
+	test_battle.rune_caster.input_rejected.connect(
+		_on_cast_rejected
+	)
 
 	for enemy in test_battle.enemies:
-		_create_enemy_ui(enemy)
+		_create_enemy_ui(
+			enemy,
+			test_battle.enemies.find(enemy),
+			test_battle.enemies.size(),
+			test_battle.resistance_knowledge
+		)
 
 		enemy.attack_started.connect(
 			_on_enemy_attack_started
@@ -92,6 +134,7 @@ func setup(test_battle) -> void:
 		enemy.attack_impacted.connect(
 			_on_enemy_attack_impacted
 		)
+		enemy.parried.connect(_on_enemy_parried)
 
 	_refresh_targets(test_battle)
 
@@ -99,6 +142,17 @@ func setup(test_battle) -> void:
 		test_battle.player.hp,
 		test_battle.player.max_hp
 	)
+	_refresh_status_presentation(test_battle)
+
+
+func _process(delta: float) -> void:
+	if not low_hp_active or low_hp_vignette == null:
+		return
+
+	low_hp_time += delta
+	var pulse := 0.5 + 0.5 * sin(low_hp_time * 7.0)
+	low_hp_vignette.modulate.a = lerpf(0.55, 1.0, pulse)
+	player_hp_bar.modulate = Color(1.0, lerpf(0.3, 0.7, pulse), lerpf(0.3, 0.7, pulse))
 
 
 func _build() -> void:
@@ -136,6 +190,13 @@ func _build() -> void:
 	)
 	root.add_child(lower_panel)
 
+	mist_overlay = ColorRect.new()
+	mist_overlay.anchor_right = 1.0
+	mist_overlay.anchor_bottom = 0.60
+	mist_overlay.color = Color(0.62, 0.76, 0.78, 0.0)
+	mist_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(mist_overlay)
+
 	enemy_layer = Control.new()
 	enemy_layer.anchor_right = 1.0
 	enemy_layer.anchor_bottom = 0.60
@@ -164,6 +225,33 @@ func _build() -> void:
 	)
 	root.add_child(player_hp_label)
 
+	player_status_grid = GridContainer.new()
+	player_status_grid.columns = 4
+	player_status_grid.anchor_left = 0.03
+	player_status_grid.anchor_top = 0.79
+	player_status_grid.anchor_right = 0.25
+	player_status_grid.anchor_bottom = 0.91
+	player_status_grid.add_theme_constant_override("h_separation", 6)
+	player_status_grid.add_theme_constant_override("v_separation", 6)
+	root.add_child(player_status_grid)
+
+	for _i in range(8):
+		var slot := Label.new()
+		slot.custom_minimum_size = Vector2(42, 32)
+		slot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		slot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		slot.text = "·"
+		player_status_grid.add_child(slot)
+
+	guard_effect = Panel.new()
+	guard_effect.anchor_left = 0.02
+	guard_effect.anchor_top = 0.62
+	guard_effect.anchor_right = 0.27
+	guard_effect.anchor_bottom = 0.96
+	guard_effect.modulate = Color(0.2, 0.85, 0.45, 0.0)
+	guard_effect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(guard_effect)
+
 	casting_ui = CastingUI.new()
 	casting_ui.anchor_left = 0.31
 	casting_ui.anchor_top = 0.65
@@ -171,39 +259,30 @@ func _build() -> void:
 	casting_ui.anchor_bottom = 0.98
 	root.add_child(casting_ui)
 
-	fusion_panel = Panel.new()
-	fusion_panel.anchor_left = 0.75
-	fusion_panel.anchor_top = 0.64
-	fusion_panel.anchor_right = 0.97
-	fusion_panel.anchor_bottom = 0.96
-	root.add_child(fusion_panel)
-
-	fusion_title = Label.new()
-	fusion_title.anchor_right = 1.0
-	fusion_title.anchor_bottom = 0.15
-	fusion_title.text = "FUSION"
-	fusion_title.horizontal_alignment = (
-		HORIZONTAL_ALIGNMENT_CENTER
+	fusion_ui = FusionUI.new()
+	fusion_ui.style = preload(
+	"res://data/runes/default_base.tres"
 	)
-	fusion_panel.add_child(fusion_title)
+	fusion_ui.anchor_left = 0.73
+	fusion_ui.anchor_top = 0.61
+	fusion_ui.anchor_right = 0.98
+	fusion_ui.anchor_bottom = 0.99
+	root.add_child(fusion_ui)
 
-	fusion_spell = Label.new()
-	fusion_spell.anchor_top = 0.45
-	fusion_spell.anchor_right = 1.0
-	fusion_spell.anchor_bottom = 0.62
-	fusion_spell.horizontal_alignment = (
-		HORIZONTAL_ALIGNMENT_CENTER
-	)
-	fusion_panel.add_child(fusion_spell)
+	hand_effect = ColorRect.new()
+	hand_effect.anchor_left = 0.64
+	hand_effect.anchor_top = 0.51
+	hand_effect.anchor_right = 0.71
+	hand_effect.anchor_bottom = 0.60
+	hand_effect.color = Color(0.8, 0.8, 0.86, 0.0)
+	hand_effect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hand_effect)
 
-	fusion_components = Label.new()
-	fusion_components.anchor_top = 0.65
-	fusion_components.anchor_right = 1.0
-	fusion_components.anchor_bottom = 0.85
-	fusion_components.horizontal_alignment = (
-		HORIZONTAL_ALIGNMENT_CENTER
-	)
-	fusion_panel.add_child(fusion_components)
+	low_hp_vignette = ColorRect.new()
+	low_hp_vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	low_hp_vignette.color = Color(0.45, 0.0, 0.0, 0.0)
+	low_hp_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(low_hp_vignette)
 	result_overlay = ColorRect.new()
 	result_overlay.set_anchors_and_offsets_preset(
 		Control.PRESET_FULL_RECT
@@ -245,36 +324,53 @@ func _build() -> void:
 	)
 	result_overlay.add_child(retry_button)
 
-func _create_enemy_ui(enemy: BattleEnemy) -> void:
+func _create_enemy_ui(
+	enemy: BattleEnemy,
+	index: int,
+	count: int,
+	knowledge: ResistanceKnowledge
+) -> void:
 	var ui := EnemyUI.new()
 
 	enemy_layer.add_child(ui)
-	ui.setup(enemy)
+	ui.setup(enemy, knowledge)
 
-	var index := enemy_uis.size()
+	var x_ratio := _get_enemy_x_ratio(index, count)
 
-	var x_positions := [
-		0.18,
-		0.50,
-		0.82
-	]
-
-	var x_ratio: float = x_positions[
-		mini(index, 2)
-	]
-
+	# EnemyUI の「中心」を x_ratio の位置に置く
 	ui.anchor_left = x_ratio
 	ui.anchor_right = x_ratio
 	ui.anchor_top = 0.28
 	ui.anchor_bottom = 0.28
 
-	ui.position = Vector2(
-		-130,
-		0
-	)
+	# EnemyUI 自身が持つ必要サイズを使う。
+	# BattleUI 側では 260x300 等をハードコードしない。
+	var ui_size := ui.get_combined_minimum_size()
+
+	ui.offset_left = -ui_size.x * 0.5
+	ui.offset_right = ui_size.x * 0.5
+	ui.offset_top = 0.0
+	ui.offset_bottom = ui_size.y
 
 	enemy_uis[enemy] = ui
 
+
+func _get_enemy_x_ratio(
+	index: int,
+	count: int
+) -> float:
+	match count:
+		1:
+			return 0.5
+
+		2:
+			return [0.33, 0.67][index]
+
+		3:
+			return [0.18, 0.50, 0.82][index]
+
+		_:
+			return float(index + 1) / float(count + 1)
 
 func refresh_targets(test_battle) -> void:
 	_refresh_targets(test_battle)
@@ -285,9 +381,7 @@ func _refresh_targets(test_battle) -> void:
 		test_battle._get_selected_target()
 	)
 
-	var show_target : bool = (
-		test_battle.rune_caster.has_combo()
-	)
+	var show_target: bool = test_battle._current_spell_uses_selected_enemy()
 
 	for enemy in enemy_uis:
 		var ui: EnemyUI = enemy_uis[enemy]
@@ -309,6 +403,13 @@ func _on_player_hp_changed(
 		current_hp,
 		max_hp
 	]
+
+	var ratio := float(current_hp) / float(maxi(max_hp, 1))
+	low_hp_active = ratio <= 0.25 and current_hp > 0
+	low_hp_vignette.color.a = clampf((0.25 - ratio) * 1.4, 0.0, 0.28)
+	low_hp_vignette.modulate.a = 1.0
+	if not low_hp_active:
+		player_hp_bar.modulate = Color.WHITE
 
 
 func _on_casting_started(
@@ -355,19 +456,7 @@ func _on_combo_changed(
 		test_battle.rune_caster.get_current_spell()
 	)
 
-	if spell == null:
-		fusion_spell.text = ""
-	else:
-		fusion_spell.text = spell.display_name
-
-	var names: Array[String] = []
-
-	for rune in combo:
-		names.append(rune.display_name)
-
-	fusion_components.text = (
-		" + ".join(names)
-	)
+	fusion_ui.update_combo(combo, spell)
 
 	casting_ui.set_spell_ready(
 		spell != null,
@@ -375,6 +464,31 @@ func _on_combo_changed(
 	)
 
 	_refresh_targets(test_battle)
+
+
+func _on_spell_activation_started(_event: PlayerAttackEvent) -> void:
+	fusion_ui.flash_fire()
+	var event := _event
+	hand_effect.color = Color(event.spell.effect_color, 0.78)
+	hand_effect.position.x += 28.0
+	var tween := create_tween()
+	tween.tween_property(hand_effect, "position:x", hand_effect.position.x - 28.0, 0.08)
+
+
+func _on_activation_lock_changed(_locked: bool, test_battle) -> void:
+	var spell: SpellData = test_battle.rune_caster.get_current_spell()
+	casting_ui.set_spell_ready(
+		spell != null,
+		test_battle.spell_executor.activation_locked
+	)
+
+
+func _on_cast_rejected(_reason: StringName) -> void:
+	casting_ui.show_rejection()
+
+
+func _on_enemy_effect_started(_event: PlayerAttackEvent) -> void:
+	create_tween().tween_property(hand_effect, "color:a", 0.0, 0.12)
 
 
 func _on_parry_changed(
@@ -401,23 +515,34 @@ func _on_parry_cleared() -> void:
 
 func _on_spell_damage(
 	target,
-	_amount: int,
-	_resistance: float,
-	_perfect_count: int,
+	amount: int,
+	resistance: float,
+	perfect_count: int,
 	_attribute_id: StringName
 ) -> void:
 	if enemy_uis.has(target):
 		var ui: EnemyUI = enemy_uis[target]
 		ui.flash_hit()
+		var color := Color.WHITE
+		if resistance > 1.0:
+			color = Color(1.0, 0.72, 0.22)
+		elif resistance < 1.0:
+			color = Color(0.65, 0.68, 0.72)
+		ui.show_damage_number(
+			str(amount),
+			color,
+			1.0 + float(perfect_count) * 0.16
+		)
 
 
 func _on_dot_damage(
 	target,
-	_amount: int
+	amount: int
 ) -> void:
 	if enemy_uis.has(target):
 		var ui: EnemyUI = enemy_uis[target]
 		ui.flash_hit()
+		ui.show_damage_number(str(amount), Color(0.9, 0.52, 0.25), 0.78)
 
 
 func _on_immune(
@@ -427,6 +552,70 @@ func _on_immune(
 	if enemy_uis.has(target):
 		var ui: EnemyUI = enemy_uis[target]
 		ui.flash_hit()
+		ui.show_damage_number("IMMUNE", Color(0.62, 0.64, 0.68), 0.9)
+
+
+func _on_impact_pulse(
+	target,
+	color: Color,
+	intensity: float,
+	_spell_id: StringName
+) -> void:
+	if enemy_uis.has(target):
+		(enemy_uis[target] as EnemyUI).pulse_status(color, intensity)
+
+
+func _on_player_damaged(amount: int) -> void:
+	var number := Label.new()
+	number.text = "-%d" % amount
+	number.anchor_left = 0.09
+	number.anchor_top = 0.64
+	number.anchor_right = 0.19
+	number.anchor_bottom = 0.69
+	number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	number.add_theme_color_override("font_color", Color(1.0, 0.35, 0.32))
+	root.add_child(number)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(number, "position:y", -36.0, 0.55)
+	tween.tween_property(number, "modulate:a", 0.0, 0.55)
+	tween.chain().tween_callback(number.queue_free)
+	_shake_root(5.0, 0.16)
+
+
+func _on_enemy_parried(enemy: BattleEnemy, _event: EnemyAttackEvent) -> void:
+	if enemy_uis.has(enemy):
+		(enemy_uis[enemy] as EnemyUI).flash_parry()
+	_shake_root(7.0, 0.12)
+
+
+func _refresh_status_presentation(test_battle) -> void:
+	var slots := player_status_grid.get_children()
+	for slot in slots:
+		(slot as Label).text = "·"
+
+	var index := 0
+	for entry in test_battle.player_status.get_debug_entries():
+		if index >= 4:
+			break
+		(slots[index] as Label).text = String(entry["id"]).substr(0, 1).to_upper()
+		(slots[index] as Label).tooltip_text = String(entry["id"])
+		index += 1
+
+	var mist_active: bool = test_battle.battle_status.has_effect(&"mist")
+	create_tween().tween_property(mist_overlay, "color:a", 0.12 if mist_active else 0.0, 0.3)
+	var guard_active: bool = test_battle.player_status.has_effect(&"algae_guard")
+	create_tween().tween_property(guard_effect, "modulate:a", 0.28 if guard_active else 0.0, 0.2)
+
+
+func _shake_root(strength: float, duration: float) -> void:
+	var origin := root.position
+	var tween := create_tween()
+	var steps := 4
+	for i in range(steps):
+		var direction := -1.0 if i % 2 == 0 else 1.0
+		tween.tween_property(root, "position:x", origin.x + strength * direction, duration / float(steps))
+	tween.tween_property(root, "position", origin, duration / float(steps))
 
 
 func _on_enemy_attack_started(
@@ -447,59 +636,56 @@ func _create_telegraph(
 	enemy: BattleEnemy,
 	event: EnemyAttackEvent
 ) -> void:
-	var label := Label.new()
+	var telegraph := TelegraphUI.new()
+	var stack_index := 0
 
-	label.text = "!"
-	label.horizontal_alignment = (
-		HORIZONTAL_ALIGNMENT_CENTER
-	)
-	label.vertical_alignment = (
-		VERTICAL_ALIGNMENT_CENTER
-	)
+	for existing_event in telegraphs:
+		if existing_event.resolved_direction == event.resolved_direction:
+			stack_index += 1
 
-	label.size = Vector2(48, 48)
+	var source_index: int = battle_ref.enemies.find(enemy)
+	var colors := [
+		Color(1.0, 0.34, 0.08),
+		Color(1.0, 0.52, 0.12),
+		Color(0.92, 0.26, 0.18),
+		Color(1.0, 0.68, 0.18)
+	]
+	telegraph.configure(colors[posmod(source_index, colors.size())])
+	telegraph.anchor_left = 0.5
+	telegraph.anchor_right = 0.5
+	telegraph.anchor_top = 0.18
+	telegraph.anchor_bottom = 0.18
 
 	match event.resolved_direction:
 		EnemyAttackEvent.ParryDirection.UP:
-			label.position = Vector2(
-				936,
-				30
-			)
+			telegraph.anchor_top = 0.03
+			telegraph.anchor_bottom = 0.03
 
 		EnemyAttackEvent.ParryDirection.DOWN:
-			label.position = Vector2(
-				936,
-				560
-			)
+			telegraph.anchor_top = 0.88
+			telegraph.anchor_bottom = 0.88
 
 		EnemyAttackEvent.ParryDirection.LEFT:
-			label.position = Vector2(
-				40,
-				300
-			)
+			telegraph.anchor_left = 0.03
+			telegraph.anchor_right = 0.03
+			telegraph.anchor_top = 0.48
+			telegraph.anchor_bottom = 0.48
 
 		EnemyAttackEvent.ParryDirection.RIGHT:
-			label.position = Vector2(
-				1832,
-				300
-			)
+			telegraph.anchor_left = 0.94
+			telegraph.anchor_right = 0.94
+			telegraph.anchor_top = 0.48
+			telegraph.anchor_bottom = 0.48
 
 		EnemyAttackEvent.ParryDirection.FRONT:
-			label.position = Vector2(
-				936,
-				110
-			)
+			pass
 
-	label.modulate = Color(
-		1.0,
-		0.35,
-		0.08,
-		0.45
-	)
-
-	telegraph_layer.add_child(label)
-
-	telegraphs[event] = label
+	telegraph.offset_left = -27.0 + float(stack_index) * 34.0
+	telegraph.offset_right = 27.0 + float(stack_index) * 34.0
+	telegraph.offset_top = -27.0
+	telegraph.offset_bottom = 27.0
+	telegraph_layer.add_child(telegraph)
+	telegraphs[event] = telegraph
 
 
 func _on_enemy_attack_progressed(
@@ -509,31 +695,8 @@ func _on_enemy_attack_progressed(
 	if not telegraphs.has(event):
 		return
 
-	var label: Label = telegraphs[event]
-
-	var alpha := lerpf(
-		0.4,
-		1.0,
-		event.telegraph_progress
-	)
-
-	if event.parry_window_active:
-		label.modulate = Color(
-			1.0,
-			0.55,
-			0.12,
-			1.0
-		)
-	else:
-		label.modulate.a = alpha
-
-	var scale_value := lerpf(
-		1.0,
-		1.25,
-		event.telegraph_progress
-	)
-
-	label.scale = Vector2.ONE * scale_value
+	var telegraph := telegraphs[event] as TelegraphUI
+	telegraph.set_progress(event.telegraph_progress, event.parry_window_active)
 
 
 func _on_enemy_attack_cancelled(
@@ -574,4 +737,7 @@ func show_result(
 
 
 func _on_retry_pressed() -> void:
+	if battle_ref != null:
+		battle_ref.persistent_data.current_hp = battle_ref.persistent_data.max_hp
+		SaveSystem.save_player(battle_ref.persistent_data)
 	get_tree().reload_current_scene()

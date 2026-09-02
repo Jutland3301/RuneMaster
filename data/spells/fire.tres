@@ -1,3 +1,14 @@
-[gd_resource type="TextMesh" format=3 uid="uid://ctgerj27msckq"]
-
+[gd_resource type="Resource" script_class="SpellData" load_steps=3 format=3 uid="uid://ctgerj27msckq"]
+[ext_resource type="Script" path="res://scripts/data/spell_data.gd" id="1_spell"]
+[ext_resource type="Script" path="res://scripts/effects/direct_damage_effect.gd" id="2_effect"]
 [resource]
+script = ExtResource("1_spell")
+id = &"fire"
+display_name = "Fire"
+required_runes = Array[StringName]([&"fire"])
+base_damage = 100.0
+attribute_id = &"fire"
+activation_time = 0.35
+target_mode = 0
+effect_script = ExtResource("2_effect")
+effect_color = Color(1, 0.22, 0.06, 1)

@@ -3,6 +3,7 @@ extends Node
 
 signal effect_added(effect_id: StringName)
 signal effect_removed(effect_id: StringName)
+signal effects_changed
 
 enum StackRule {
 	IGNORE,
@@ -18,24 +19,28 @@ func _process(delta: float) -> void:
 	if not battle_running:
 		return
 
-	var expired: Array[StringName] = []
+	var emptied: Array[StringName] = []
 
-	for effect_id in effects:
+	for effect_id in effects.keys():
 		var entries: Array = effects[effect_id]
 
-		for entry in entries:
+		for i in range(entries.size() - 1, -1, -1):
+			var entry: Dictionary = entries[i]
 			entry["remaining"] = maxf(
 				0.0,
 				float(entry["remaining"]) - delta
 			)
 
-		for entry in entries:
 			if float(entry["remaining"]) <= 0.0:
-				expired.append(effect_id)
-				break
+				entries.remove_at(i)
 
-	for effect_id in expired:
-		remove_effect(effect_id)
+		if entries.is_empty():
+			emptied.append(effect_id)
+
+	for effect_id in emptied:
+		effects.erase(effect_id)
+		effect_removed.emit(effect_id)
+		effects_changed.emit()
 
 
 func add_effect(
@@ -57,6 +62,7 @@ func add_effect(
 					entries[0]["duration"] = duration
 					entries[0]["metadata"] = metadata
 
+				effects_changed.emit()
 				return true
 
 			StackRule.STACK:
@@ -74,6 +80,7 @@ func add_effect(
 	effects[effect_id].append(entry)
 
 	effect_added.emit(effect_id)
+	effects_changed.emit()
 	return true
 
 
@@ -83,6 +90,7 @@ func remove_effect(effect_id: StringName) -> void:
 
 	effects.erase(effect_id)
 	effect_removed.emit(effect_id)
+	effects_changed.emit()
 
 
 func has_effect(effect_id: StringName) -> bool:
@@ -111,6 +119,20 @@ func get_metadata(effect_id: StringName) -> Dictionary:
 		return {}
 
 	return entries[0]["metadata"]
+
+
+func get_debug_entries() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+
+	for effect_id in effects:
+		for entry in effects[effect_id]:
+			result.append({
+				"id": effect_id,
+				"remaining": float(entry["remaining"]),
+				"duration": float(entry["duration"])
+			})
+
+	return result
 
 
 func clear_all() -> void:

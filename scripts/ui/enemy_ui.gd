@@ -2,72 +2,104 @@ class_name EnemyUI
 extends Control
 
 var enemy: BattleEnemy
+var knowledge: ResistanceKnowledge
 
-var name_label: Label
+var hp_trail: ProgressBar
 var hp_bar: ProgressBar
-var hp_label: Label
-var body: ColorRect
+var body: Control
+var body_color: ColorRect
 var target_frame: Panel
+var hover_ui: EnemyHoverUI
+var status_marks: HBoxContainer
 
-var base_color := Color(0.32, 0.30, 0.34)
 
-
-func setup(p_enemy: BattleEnemy) -> void:
+func setup(p_enemy: BattleEnemy, p_knowledge: ResistanceKnowledge) -> void:
 	enemy = p_enemy
-
+	knowledge = p_knowledge
 	custom_minimum_size = Vector2(260, 300)
-
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build()
 
 	hp_bar.max_value = enemy.data.max_hp
 	hp_bar.value = enemy.hp
-
-	hp_label.text = "%d / %d" % [
-		enemy.hp,
-		enemy.data.max_hp
-	]
-
-	# Temporary debug/test presentation.
-	# Final enemy sprite can replace this body later.
-	body.color = base_color
+	hp_trail.max_value = enemy.data.max_hp
+	hp_trail.value = enemy.hp
 
 	enemy.hp_changed.connect(_on_hp_changed)
 	enemy.died.connect(_on_died)
+	enemy.status_controller.effects_changed.connect(_refresh_status_marks)
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
+
+	if knowledge != null:
+		knowledge.knowledge_changed.connect(_on_knowledge_changed)
+
+	_start_idle_motion()
+
+
+func _process(_delta: float) -> void:
+	if hover_ui != null and hover_ui.visible and enemy != null:
+		hover_ui.show_enemy(enemy, knowledge)
 
 
 func _build() -> void:
-	name_label = Label.new()
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.position = Vector2(0, 0)
-	name_label.size = Vector2(260, 30)
-	name_label.text = enemy.data.display_name
-	add_child(name_label)
+	hp_trail = ProgressBar.new()
+	hp_trail.position = Vector2(20, 20)
+	hp_trail.size = Vector2(220, 16)
+	hp_trail.show_percentage = false
+	hp_trail.modulate = Color(0.82, 0.46, 0.22)
+	add_child(hp_trail)
 
 	hp_bar = ProgressBar.new()
-	hp_bar.position = Vector2(20, 34)
-	hp_bar.size = Vector2(220, 18)
+	hp_bar.position = Vector2(20, 20)
+	hp_bar.size = Vector2(220, 16)
 	hp_bar.show_percentage = false
 	add_child(hp_bar)
 
-	hp_label = Label.new()
-	hp_label.position = Vector2(20, 54)
-	hp_label.size = Vector2(220, 24)
-	hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(hp_label)
+	status_marks = HBoxContainer.new()
+	status_marks.position = Vector2(20, 40)
+	status_marks.size = Vector2(220, 22)
+	status_marks.alignment = BoxContainer.ALIGNMENT_CENTER
+	status_marks.add_theme_constant_override("separation", 4)
+	add_child(status_marks)
 
 	target_frame = Panel.new()
-	target_frame.position = Vector2(45, 85)
-	target_frame.size = Vector2(170, 190)
+	target_frame.position = Vector2(43, 72)
+	target_frame.size = Vector2(174, 194)
 	target_frame.visible = false
+	var outline := StyleBoxFlat.new()
+	outline.bg_color = Color(0, 0, 0, 0)
+	outline.border_color = Color(0.75, 0.12, 0.12, 0.72)
+	outline.set_border_width_all(2)
+	target_frame.add_theme_stylebox_override("panel", outline)
 	add_child(target_frame)
 
-	body = ColorRect.new()
-	body.position = Vector2(55, 95)
-	body.size = Vector2(150, 170)
-	add_child(body)
+	if enemy.data.sprite != null:
+		var sprite := TextureRect.new()
 
-	# Keep frame above body.
+		sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+
+		sprite.texture = enemy.data.sprite
+		sprite.position = Vector2(30, 65)
+		sprite.size = Vector2(200, 210)
+
+		body = sprite
+	else:
+		body_color = ColorRect.new()
+		body_color.color = enemy.data.presentation_color
+		body_color.position = Vector2(53, 82)
+		body_color.size = Vector2(154, 174)
+		body = body_color
+
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(body)
 	move_child(target_frame, get_child_count() - 1)
+
+	hover_ui = EnemyHoverUI.new()
+	hover_ui.position = Vector2(-5, 68)
+	hover_ui.visible = false
+	add_child(hover_ui)
 
 
 func set_targeted(value: bool) -> void:
@@ -75,75 +107,118 @@ func set_targeted(value: bool) -> void:
 
 
 func flash_attack() -> void:
-	if body == null:
-		return
-
-	var old := body.color
-	body.color = Color(0.75, 0.35, 0.12)
-
-	var tween := create_tween()
-	tween.tween_property(
-		body,
-		"color",
-		old,
-		0.18
-	)
+	_flash(Color(1.0, 0.45, 0.12), 0.18)
 
 
 func flash_hit() -> void:
-	if body == null:
-		return
-
-	var old := body.color
-	body.color = Color.WHITE
-
+	_flash(Color.WHITE, 0.12)
+	var start_x := body.position.x
 	var tween := create_tween()
-	tween.tween_property(
-		body,
-		"color",
-		old,
-		0.12
-	)
+	tween.tween_property(body, "position:x", start_x + 7.0, 0.035)
+	tween.tween_property(body, "position:x", start_x - 5.0, 0.045)
+	tween.tween_property(body, "position:x", start_x, 0.045)
 
 
-func _on_hp_changed(
-	_changed_enemy: BattleEnemy,
-	current_hp: int,
-	max_hp: int
+func flash_parry() -> void:
+	var old := body.modulate
+	body.modulate = Color.WHITE
+	var tween := create_tween()
+	tween.tween_interval(0.075)
+	tween.tween_property(body, "modulate", old, 0.12)
+
+
+func pulse_status(color: Color, intensity: float = 1.0) -> void:
+	var overlay := ColorRect.new()
+	overlay.position = body.position - Vector2(8, 8)
+	overlay.size = body.size + Vector2(16, 16)
+	overlay.color = Color(color, clampf(0.22 * intensity, 0.18, 0.75))
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(overlay)
+	var tween := create_tween()
+	tween.tween_property(overlay, "color:a", 0.0, 0.18 + 0.06 * intensity)
+	tween.tween_callback(overlay.queue_free)
+
+
+func show_damage_number(
+	text: String,
+	color: Color,
+	scale_amount: float = 1.0
 ) -> void:
+	var number := Label.new()
+	number.text = text
+	number.position = Vector2(88, 105)
+	number.size = Vector2(120, 38)
+	number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	number.add_theme_font_size_override("font_size", int(24.0 * scale_amount))
+	number.add_theme_color_override("font_color", color)
+	number.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(number)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(number, "position:y", number.position.y - 52.0, 0.7)
+	tween.tween_property(number, "modulate:a", 0.0, 0.7)
+	tween.chain().tween_callback(number.queue_free)
+
+
+func _flash(color: Color, duration: float) -> void:
+	var old := body.modulate
+	body.modulate = color
+	create_tween().tween_property(body, "modulate", old, duration)
+
+
+func _on_hp_changed(_changed_enemy: BattleEnemy, current_hp: int, max_hp: int) -> void:
 	hp_bar.max_value = max_hp
+	hp_trail.max_value = max_hp
 	hp_bar.value = current_hp
 
-	hp_label.text = "%d / %d" % [
-		current_hp,
-		max_hp
-	]
-
+	var tween := create_tween()
+	tween.tween_interval(0.3)
+	tween.tween_property(hp_trail, "value", current_hp, 0.25)
 	flash_hit()
 
+	if hover_ui.visible:
+		hover_ui.show_enemy(enemy, knowledge)
 
-func _on_died(
-	_dead_enemy: BattleEnemy
-) -> void:
+
+func _on_died(_dead_enemy: BattleEnemy) -> void:
 	target_frame.visible = false
-
+	hover_ui.visible = false
 	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(body, "scale", Vector2(1.28, 0.04), 0.22)
+	tween.tween_property(body, "rotation", 0.16, 0.22)
+	tween.tween_property(body, "modulate:a", 0.0, 0.22)
+	tween.chain().tween_callback(func(): visible = false)
 
-	tween.tween_property(
-		body,
-		"scale",
-		Vector2(1.25, 0.05),
-		0.18
-	)
 
-	tween.parallel().tween_property(
-		body,
-		"modulate:a",
-		0.0,
-		0.18
-	)
+func _on_mouse_entered() -> void:
+	if enemy.is_alive():
+		hover_ui.show_enemy(enemy, knowledge)
+		hover_ui.visible = true
 
-	tween.tween_callback(
-		func():
-			visible = false
-	)
+
+func _on_mouse_exited() -> void:
+	hover_ui.visible = false
+
+
+func _on_knowledge_changed(enemy_id: StringName, _attribute_id: StringName) -> void:
+	if enemy.data.id == enemy_id and hover_ui.visible:
+		hover_ui.show_enemy(enemy, knowledge)
+
+
+func _refresh_status_marks() -> void:
+	for child in status_marks.get_children():
+		child.queue_free()
+
+	for entry in enemy.status_controller.get_debug_entries():
+		var mark := Label.new()
+		mark.text = String(entry["id"]).substr(0, 1).to_upper()
+		mark.tooltip_text = String(entry["id"])
+		status_marks.add_child(mark)
+
+
+func _start_idle_motion() -> void:
+	var base_y := body.position.y
+	var tween := create_tween().set_loops()
+	tween.tween_property(body, "position:y", base_y - 4.0, 1.2).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(body, "position:y", base_y + 2.0, 1.2).set_trans(Tween.TRANS_SINE)

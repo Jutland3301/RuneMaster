@@ -17,6 +17,7 @@ signal combo_changed(
 
 signal combo_cleared
 signal spell_ready(spell: SpellData)
+signal input_rejected(reason: StringName)
 
 var spell_database: SpellDatabase
 
@@ -120,6 +121,7 @@ func can_begin_rune(rune: RuneData) -> bool:
 
 func begin_rune(rune: RuneData) -> bool:
 	if not can_begin_rune(rune):
+		reject_input(&"invalid_rune_or_combo")
 		return false
 
 	if rune.casting_pattern == null:
@@ -136,6 +138,10 @@ func begin_rune(rune: RuneData) -> bool:
 	casting_started.emit(rune)
 
 	return true
+
+
+func reject_input(reason: StringName) -> void:
+	input_rejected.emit(reason)
 
 
 func judge_current_cast() -> StringName:

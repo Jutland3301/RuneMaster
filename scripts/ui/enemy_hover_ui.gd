@@ -9,8 +9,8 @@ var resistance_label: Label
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(
-		260,
-		180
+		300,
+		280
 	)
 
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -33,8 +33,8 @@ func _ready() -> void:
 	resistance_label = Label.new()
 	resistance_label.position = Vector2(12, 98)
 	resistance_label.size = Vector2(
-		236,
-		75
+		276,
+		170
 	)
 	resistance_label.autowrap_mode = (
 		TextServer.AUTOWRAP_WORD_SMART
@@ -64,6 +64,9 @@ func show_enemy(
 
 	if enemy.paralysis_remaining > 0.0:
 		statuses.append("PARALYSIS")
+
+	if enemy.status_controller.has_effect(&"burn"):
+		statuses.append("BURN")
 
 	if statuses.is_empty():
 		status_label.text = "Status: -"

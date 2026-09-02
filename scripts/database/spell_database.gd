@@ -1,28 +1,33 @@
 class_name SpellDatabase
 extends RefCounted
 
+const SPELL_DIRECTORY := "res://data/spells"
+
 var _spells: Dictionary = {}
 
 
 func register_spell(spell: SpellData) -> void:
-	if spell == null:
+	if spell == null or spell.id == &"" or spell.required_runes.is_empty():
 		return
 
-	var key := make_key(spell.required_runes)
-	_spells[key] = spell
+	_spells[make_key(spell.required_runes)] = spell
 
 
 func get_spell(rune_ids: Array[StringName]) -> SpellData:
-	var key := make_key(rune_ids)
-
-	if _spells.has(key):
-		return _spells[key]
-
-	return null
+	return _spells.get(make_key(rune_ids)) as SpellData
 
 
 func has_spell(rune_ids: Array[StringName]) -> bool:
 	return _spells.has(make_key(rune_ids))
+
+
+func get_all_spells() -> Array[SpellData]:
+	var result: Array[SpellData] = []
+
+	for spell in _spells.values():
+		result.append(spell as SpellData)
+
+	return result
 
 
 static func make_key(rune_ids: Array[StringName]) -> String:
@@ -32,149 +37,25 @@ static func make_key(rune_ids: Array[StringName]) -> String:
 		normalized.append(String(rune_id))
 
 	normalized.sort()
-
 	return "|".join(normalized)
+
+
 func register_default_spells() -> void:
 	_spells.clear()
 
-	register_spell(
-		_make_spell(
-			&"fire",
-			"Fire",
-			[&"fire"],
-			100.0,
-			&"fire",
-			0.35,
-			SpellData.TargetMode.SINGLE_ENEMY
-		)
-	)
+	var files := DirAccess.get_files_at(SPELL_DIRECTORY)
+	files.sort()
 
-	register_spell(
-		_make_spell(
-			&"water",
-			"Water",
-			[&"water"],
-			70.0,
-			&"water",
-			0.25,
-			SpellData.TargetMode.SINGLE_ENEMY
-		)
-	)
+	for file_name in files:
+		if not file_name.ends_with(".tres"):
+			continue
 
-	register_spell(
-		_make_spell(
-			&"lightning",
-			"Lightning",
-			[&"lightning"],
-			40.0,
-			&"lightning",
-			0.08,
-			SpellData.TargetMode.SINGLE_ENEMY
-		)
-	)
+		var resource := load(SPELL_DIRECTORY.path_join(file_name))
 
-	register_spell(
-		_make_spell(
-			&"grass",
-			"Grass",
-			[&"grass"],
-			50.0,
-			&"grass",
-			0.35,
-			SpellData.TargetMode.SINGLE_ENEMY
-		)
-	)
+		if resource is SpellData:
+			register_spell(resource as SpellData)
+		else:
+			push_error("Invalid SpellData resource: %s" % file_name)
 
-	register_spell(
-		_make_spell(
-			&"mist",
-			"Mist",
-			[&"fire", &"water"],
-			0.0,
-			&"mist",
-			0.35,
-			SpellData.TargetMode.BATTLE_WIDE
-		)
-	)
-
-	register_spell(
-		_make_spell(
-			&"plasma",
-			"Plasma",
-			[&"fire", &"lightning"],
-			200.0,
-			&"plasma",
-			0.35,
-			SpellData.TargetMode.SINGLE_ENEMY
-		)
-	)
-
-	register_spell(
-		_make_spell(
-			&"burning_spores",
-			"Burning Spores",
-			[&"fire", &"grass"],
-			130.0,
-			&"burning_spores",
-			0.35,
-			SpellData.TargetMode.SINGLE_ENEMY
-		)
-	)
-
-	register_spell(
-		_make_spell(
-			&"electric_whip",
-			"Electric Whip",
-			[&"water", &"lightning"],
-			100.0,
-			&"electric_whip",
-			0.08,
-			SpellData.TargetMode.RANDOM_MULTI
-		)
-	)
-
-	register_spell(
-		_make_spell(
-			&"algae_guard",
-			"Algae Guard",
-			[&"water", &"grass"],
-			0.0,
-			&"algae_guard",
-			0.30,
-			SpellData.TargetMode.SELF
-		)
-	)
-
-	register_spell(
-		_make_spell(
-			&"paralysis",
-			"Paralysis",
-			[&"lightning", &"grass"],
-			70.0,
-			&"paralysis",
-			0.30,
-			SpellData.TargetMode.SINGLE_ENEMY
-		)
-	)
-
-
-func _make_spell(
-	p_id: StringName,
-	p_display_name: String,
-	p_runes: Array[StringName],
-	p_base_damage: float,
-	p_attribute: StringName,
-	p_activation_time: float,
-	p_target_mode: SpellData.TargetMode
-) -> SpellData:
-	var spell := SpellData.new()
-
-	spell.id = p_id
-	spell.display_name = p_display_name
-	spell.required_runes = p_runes
-	spell.base_damage = p_base_damage
-	spell.attribute_id = p_attribute
-	spell.activation_time = p_activation_time
-	spell.target_mode = p_target_mode
-
-	return spell
+	if _spells.size() != 10:
+		push_error("Expected 10 active spells, loaded %d." % _spells.size())
